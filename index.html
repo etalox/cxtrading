@@ -253,7 +253,7 @@
                         // getY modificado para mobile
                         const getY = (price) => {
                             const baseY = height - ((price - yMin) / (yMax - yMin)) * height;
-                            return isMobileRef.current ? baseY + yOffset : baseY;
+                            return isMobileRef.current ? baseY - yOffset : baseY;
                         };
                         // Línea de precio
                         ctx.strokeStyle = '#222';

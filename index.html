@@ -205,7 +205,8 @@
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         const state = marketState.current;
-                        const width = canvas.width, height = canvas.height;
+                        const width = containerRef.current.clientWidth;
+                        const height = containerRef.current.clientHeight;
                         const priceSmoothing = 0.3;
                         state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing;
                         const horizontalSmoothing = 0.2;

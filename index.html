@@ -543,21 +543,17 @@
                 let logicInterval;
                 const LOGIC_RATE_MS = 1000 / TICK_RATE;
                 
-                // Referencia para el manejo de pausa/catch-up
+                // Referencias para pausa/catch-up
                 const lastLogicTimeRef = useRef(Date.now());
                 const isTabVisibleRef = useRef(true);
 
-                // Función central de lógica (extraída para reutilizar en catch-up)
+                // Función central de lógica
                 const runMarketLogic = () => {
                     processMarketLogic(0); updateVisualCandleLogic(0);
                     processMarketLogic(1); updateVisualCandleLogic(1);
                     processMarketLogic(2); updateVisualCandleLogic(2);
                     
-                    // IA y lógica de señales (Simplificada para el ejemplo, asegúrate de incluir tu bloque completo aquí si es necesario)
-                    // ... (Tu bloque de lógica de AI y Shadow Trades va aquí dentro si quieres que aprenda en segundo plano, 
-                    // pero para efecto visual "lag", basta con procesar el mercado) ...
-                    
-                    // --- MANTENER TU LÓGICA DE AI ORIGINAL AQUÍ ---
+                    // IA Shadow Trades
                     const state = marketStatesRef.current[activeTab];
                     const ks = kinematicsRef.current[activeTab];
                     if (state && ks) {
@@ -569,29 +565,24 @@
                         }
                         aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; });
                     }
-                    // ----------------------------------------------
                 };
 
-                // Loop de Lógica Principal
                 const logicLoop = () => {
                     const now = Date.now();
-                    if (!navigator.onLine || !isTabVisibleRef.current) return; // Pausa si offline u oculto
+                    if (!navigator.onLine || !isTabVisibleRef.current) return; 
 
                     const deltaTime = now - lastLogicTimeRef.current;
                     let ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
 
                     if (ticksToProcess > 0) {
-                        // Límite de seguridad para evitar congelamientos si el delta es enorme
                         if (ticksToProcess > 2000) ticksToProcess = 2000;
-                        
-                        lastLogicTimeRef.current += ticksToProcess * LOGIC_RATE_MS; // Avanzar tiempo lógico
-
+                        lastLogicTimeRef.current += ticksToProcess * LOGIC_RATE_MS; 
                         for (let i = 0; i < ticksToProcess; i++) {
                             runMarketLogic();
                         }
                     }
                     
-                    // Procesar expiración de trades (siempre)
+                    // Procesar expiración
                     const realNow = Date.now();
                     const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
                     if (expiredTrades.length > 0) {
@@ -602,7 +593,6 @@
                             if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
                             
                             if (trade.tabIndex === activeTab) {
-                                // Nota: Al estar en catch-up, visualValue puede estar atrasado, usamos currentValue para resultado final exacto
                                 const resultPrice = tradeState.currentValue; 
                                 const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
                                 resultLabelsRef.current.push({
@@ -619,50 +609,30 @@
                     }
                 };
 
-                // Manejador de Visibilidad (Catch-up Effect)
                 const handleVisibilityChange = () => {
                     if (document.hidden) {
                         isTabVisibleRef.current = false;
-                        // Al ocultar, NO actualizamos lastLogicTimeRef. 
-                        // Dejamos que el tiempo se "acumule" en la diferencia real.
                     } else {
                         isTabVisibleRef.current = true;
-                        
-                        // AL VOLVER: Calculamos todo el tiempo perdido
                         const now = Date.now();
                         const timeMissed = now - lastLogicTimeRef.current;
                         const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
                         
-                        // Si pasó mucho tiempo (> 10 seg), hacemos un "warp" rápido
-                        // En lugar de procesar instantáneamente (que congelaría la UI),
-                        // podemos procesar por lotes o simplemente procesar instantáneamente si no es demasiado.
-                        // Para el efecto visual de "camara rápida" real, necesitaríamos separar la lógica del render,
-                        // pero para "ponerse al día" simplemente ejecutamos el bucle:
-                        
-                        if (ticksMissed > 0 && ticksMissed < 10000) { // Límite para evitar colapso
-                            // Procesamos todo lo pendiente de golpe para actualizar el estado
-                            // Esto creará el efecto de que la línea salta al presente
-                            // Si quieres animación de "fast forward", requeriría una arquitectura más compleja.
-                            // Esta solución simplemente evita la línea plana.
+                        if (ticksMissed > 0 && ticksMissed < 10000) { 
                             for (let i = 0; i < ticksMissed; i++) {
                                 runMarketLogic();
                             }
-                            lastLogicTimeRef.current = now; // Sincronizar tiempo
+                            lastLogicTimeRef.current = now; 
                         } else if (ticksMissed >= 10000) {
-                            // Si pasó demasiado tiempo (ej. horas), mejor resetear para no congelar
                             lastLogicTimeRef.current = now;
                         }
                     }
                 };
 
                 document.addEventListener("visibilitychange", handleVisibilityChange);
-                logicInterval = setInterval(logicLoop, 100); // Check loop cada 100ms
+                logicInterval = setInterval(logicLoop, 100); 
 
-                // --- DRAW LOOP (Igual que antes) ---
                 const drawLoop = () => {
-                    // ... (TU CÓDIGO DE DIBUJO ACTUAL) ...
-                    // Asegúrate de pegar aquí todo el contenido de tu drawLoop original
-                    // ...
                     const now = Date.now();
                     const state = marketStatesRef.current[activeTab]; 
                     if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
@@ -670,25 +640,19 @@
                          setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
                          lastUIUpdateRef.current = now;
                     }
-                    // ... Resto del renderizado canvas ...
-                    // ...
-                     const canvas = canvasRef.current;
+
+                    const canvas = canvasRef.current;
                     if (canvas) {
-                        // ... Pega aquí todo el bloque de renderizado canvas que tenías ...
-                        // ... hasta animationId = requestAnimationFrame(drawLoop);
                         const dpr = window.devicePixelRatio || 1;
                         const width = canvas.width / dpr;
                         const height = canvas.height / dpr;
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         
-                         // --- FÍSICA UNIFICADA (Evita jitter/saltos) ---
+                        // FÍSICA Y SUAVIZADO
                         const SMOOTHING = 0.05; 
                         
-                        // 1. Suavizado de Precio
-                        state.visualValue += (state.currentValue - state.visualValue) * 0.3; // Precio puede ser más rápido
-                        
-                        // 2. Suavizado de Scroll Horizontal (Sincronizado con Zoom)
+                        state.visualValue += (state.currentValue - state.visualValue) * 0.3; 
                         state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
                         
                         ctx.fillStyle = '#050505';
@@ -698,12 +662,10 @@
                         let allCandles = [...state.candles];
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
                         
-                        // 3. Suavizado de Zoom (Sincronizado)
                         zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * SMOOTHING;
                         if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.05) zoomCurrentRef.current = zoomTargetRef.current;
                         const candleWidth = width / zoomCurrentRef.current;
                         
-                        // 4. Lógica de Anchor (Posición del gráfico)
                         let targetAnchorPercent = 0.75;
                         const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); 
                         if (activeTrades.length > 0) {
@@ -722,7 +684,7 @@
                          allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
                          if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
 
-                        // --- SUAVIZADO DEL ESCALADO VERTICAL (Eje Y) ---
+                        // SUAVIZADO VERTICAL
                         if (typeof state.visualMinPrice === 'undefined') {
                             state.visualMinPrice = minPrice;
                             state.visualMaxPrice = maxPrice;
@@ -740,7 +702,6 @@
                         let yMin = state.visualMinPrice;
                         let yMax = state.visualMaxPrice;
 
-                        // Safe Zone Logic (Integrada)
                         const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
                         const safeZoneBottom = Math.min(height - 250, height * 0.65);
                         
@@ -748,20 +709,16 @@
                             const pixelsOff = currentPriceY - safeZoneBottom;
                             const pricePerPixel = (yMax - yMin) / height;
                             const priceShift = pixelsOff * pricePerPixel;
-                            
                             state.visualMinPrice -= priceShift * 0.1;
                             state.visualMaxPrice -= priceShift * 0.1;
-                            
                             yMin = state.visualMinPrice;
                             yMax = state.visualMaxPrice;
                         }
 
-                         // ... Resto del dibujado (Líneas, Velas, Trades, Labels) ...
-                         // IMPORTANTE: COPIA EL RESTO DE TU LÓGICA DE DIBUJO AQUÍ
-                         // (getY, grid, trades, labels, etc.)
-                         
                         const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
                         const currentY = getY(state.visualValue);
+                        
+                        // GRID
                         ctx.strokeStyle = '#222';
                         ctx.setLineDash([4, 4]);
                         ctx.beginPath();
@@ -770,6 +727,7 @@
                         ctx.stroke();
                         ctx.setLineDash([]);
                         
+                        // FUTURE LINES
                         const previewDuration = state.tradeDuration || 10000;
                         const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
                         const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
@@ -789,6 +747,7 @@
                         ctx.stroke();
                         ctx.setLineDash([]);
 
+                        // CANDLES
                         const barWidth = Math.max(1, candleWidth * 0.8);
                         allCandles.forEach((candle, i) => {
                             const x = getX(i);
@@ -807,6 +766,7 @@
                             ctx.shadowBlur = 0;
                         });
 
+                        // TRADES
                         activeTrades.forEach(trade => {
                             const yEntry = getY(trade.entryPrice);
                             const xEntry = getX(trade.entryIndex);
@@ -839,6 +799,7 @@
                             ctx.fill();
                         });
 
+                        // LABELS
                         resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); 
                         resultLabelsRef.current.forEach(label => {
                             const age = Date.now() - label.timestamp;
@@ -867,6 +828,7 @@
                         });
                         ctx.globalAlpha = 1;
 
+                        // PRICE LABEL
                         const isSmallScreen = width < 768;
                         const labelX = isSmallScreen ? 0 : width - 100;
                         const textX = isSmallScreen ? 50 : width - 50;
@@ -882,7 +844,7 @@
                 };
                 
                 lastTimeRef.current = Date.now();
-                drawLoop(); // Iniciar dibujo
+                drawLoop(); 
 
                 return () => {
                     clearInterval(logicInterval);

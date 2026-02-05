@@ -230,7 +230,7 @@
                         addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
                         state.lastSignalTick = state.currentValue;
                         
-                        // 2. AUTOPYLOT: SOLO 1 TRADE SIMULTÁNEO
+                        // 2. AUTOPILOT: SOLO 1 TRADE SIMULTÁNEO
                         if (autopilot && confidence > 0.6 && activeTradesRef.current.length === 0) {
                             const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
                             if (lastSignalRef.current !== currentSignal) { 
@@ -419,7 +419,7 @@
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
-                // 2. RESTRICCIÓN AUTOPYLOT: Si activo, max 1 trade global. Si no, max 4.
+                // 2. RESTRICCIÓN AUTOPILOT: Si activo, max 1 trade global. Si no, max 4.
                 const maxTrades = autopilot ? 1 : 4;
                 if (activeTradesRef.current.length >= maxTrades) return;
                 
@@ -878,14 +878,14 @@
                                 </div>
                             </button>
 
-                            {/* 3. AUTOPYLOT (Renombrado y actualizado) */}
+                            {/* 3. AUTOPILOT (Renombrado y actualizado) */}
                             {!isMobile && (
                                 <div className="glass-button h-16 px-6 flex items-center gap-4 order-2 cursor-pointer" onClick={() => setAutopilot(!autopilot)}>
                                     <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
                                         <div className="toggle-knob"></div>
                                     </div>
                                     <div className="flex flex-col items-start gap-1">
-                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPYLOT</div>
+                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
                                         <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
                                     </div>
                                 </div>

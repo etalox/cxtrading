@@ -25,6 +25,9 @@
         .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 40px; }
         .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 40px; transition: all 0.2s ease; }
         .glass-button:active { transform: scale(0.96); }
+        .glass-tab { background: rgba(255, 255, 255, 0.05); border-radius: 12px; transition: all 0.2s ease; cursor: pointer; }
+        .glass-tab:hover { background: rgba(255, 255, 255, 0.15); }
+        .glass-tab.active { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255,255,255,0.3); }
 
         .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
@@ -45,13 +48,62 @@
             activityWin: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/win.png',
             activityLoss: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loss.png',
             activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
+            grid: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png', // Placeholder para icono de tabs si quieres
         };
+
+        // LISTAS ORDENADAS POR "INTENSIDAD"
+        // Index bajo = Menos volatilidad/agresión. Index alto = Más locura.
+        const MATERIALS = ["PLATA", "BRONCE", "HIERRO", "COBRE", "LITIO", "ORO", "RODIO", "IRIDIO", "PLASMA", "AX-99"];
+        
+        // LISTAS ORDENADAS POR "ESTRUCTURA"
+        // Index bajo = Caótico/Ruido. Index alto = Estructurado/Tendencia clara.
+        // Hacemos que los estructurados (altos) sean menos probables repitiendo los bajos.
+        const ADJECTIVES = [
+            "01", "02", "05", "10", "15", "RAW", "20", "25", // Caóticos (Muy comunes)
+            "30", "45", "STD", "50",                         // Normales (Comunes)
+            "80", "90", "PRO", "PRIME", "MAX"                // Estructurados (Raros)
+        ];
 
         const MarketSim = () => {
             const isMobile = window.innerWidth < 768;
             const INITIAL_ZOOM = isMobile ? 160 : 320;
             const isMobileRef = useRef(isMobile);
             
+            // --- NUEVO: GESTIÓN DE TABS ---
+            const [activeTab, setActiveTab] = useState(0); // 0, 1, 2
+            // Estado global para guardar los datos de los 3 activos
+            // Usamos useRef para el estado del mercado "vivo" de cada tab, para no perder la simulación
+            // Pero necesitamos useState para nombres y precios UI
+            const [assetsInfo, setAssetsInfo] = useState([
+                { name: "INIT 01", price: 1000, change: 0 },
+                { name: "INIT 02", price: 1000, change: 0 },
+                { name: "INIT 03", price: 1000, change: 0 }
+            ]);
+            
+            // MarketState ahora es un ARRAY de 3 estados independientes
+            // Inicializamos 3 estados vacíos que se llenarán
+            const createEmptyState = () => ({
+                visualTicks: [], candles: [], longTermTicks: [], currentValue: 1000, visualValue: 1000, 
+                lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, 
+                structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, 
+                currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
+                ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
+                currentAnchor: 0.75, tradeDuration: 10000,
+                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0 },
+                initialized: false
+            });
+
+            const marketStatesRef = useRef([createEmptyState(), createEmptyState(), createEmptyState()]);
+            // TickHistory y Kinematics también se triplican
+            const tickHistoriesRef = useRef([[], [], []]);
+            const kinematicsRef = useRef([
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
+            ]);
+
+            // --- FIN NUEVO ---
+
             useEffect(() => {
                 const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
                 updateMobile();
@@ -60,7 +112,7 @@
                 if (!container) return () => window.removeEventListener('resize', updateMobile);
 
                 const isInteractive = (node) => {
-                    try { return node && node.closest && node.closest('button, input, .glass-button'); } catch (e) { return false; }
+                    try { return node && node.closest && node.closest('button, input, .glass-button, .glass-tab'); } catch (e) { return false; }
                 };
 
                 const onWheel = (e) => {
@@ -113,8 +165,6 @@
                 };
             }, []);
 
-            const materials = ["AX", "BR", "ORE", "CX", "PLATA", "F", "G", "X", "Y", "RB"];
-            const adjectives = ["45", "19", "91", "10", "11", "05", "PRO", "16", "55"];
             const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
             const DURATIONS = [5000, 10000, 15000, 30000];
 
@@ -124,7 +174,6 @@
             const [notifications, setNotifications] = useState([]); 
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
             const [isGenerating, setIsGenerating] = useState(false); 
-            const [assetName, setAssetName] = useState("—"); 
             const [currentDuration, setCurrentDuration] = useState(10); 
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
@@ -138,18 +187,12 @@
                 history: [], 
                 shadowTrades: [] 
             });
-            
             const resultLabelsRef = useRef([]);
-
             const sigmoid = (x) => 1 / (1 + Math.exp(-x));
             
             const trainAI = (features, actualOutcome) => { 
                 const brain = aiBrain.current; 
-                const rawSum = (features.vel * brain.weights.velocity) + 
-                               (features.acc * brain.weights.acceleration) + 
-                               (features.z * brain.weights.zScore) + 
-                               (features.dur * brain.weights.duration) + 
-                               brain.weights.bias; 
+                const rawSum = (features.vel * brain.weights.velocity) + (features.acc * brain.weights.acceleration) + (features.z * brain.weights.zScore) + (features.dur * brain.weights.duration) + brain.weights.bias; 
                 const predictedConfidence = sigmoid(rawSum); 
                 const error = actualOutcome - predictedConfidence; 
                 brain.weights.velocity += brain.learningRate * error * features.vel; 
@@ -163,53 +206,57 @@
             const addNotification = useCallback((data) => { 
                 if (data.type === 'SIGNAL' && isNotificationVisible.current) return; 
                 if (data.type === 'WIN' || data.type === 'LOSS') return;
-
                 const id = Date.now() + Math.random(); 
                 const duration = data.type === 'OFFLINE' ? 0 : 4000; 
-                setNotifications(prev => { 
-                    if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; 
-                    return prev; 
-                }); 
-                if (data.type !== 'OFFLINE') { 
-                    isNotificationVisible.current = true; 
-                    setTimeout(() => { 
-                        setNotifications(prev => prev.filter(n => n.id !== id)); 
-                        if (notifications.length <= 1) isNotificationVisible.current = false; 
-                    }, duration); 
-                } else { 
-                    isNotificationVisible.current = true; 
-                } 
+                setNotifications(prev => { if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; return prev; }); 
+                if (data.type !== 'OFFLINE') { isNotificationVisible.current = true; setTimeout(() => { setNotifications(prev => prev.filter(n => n.id !== id)); if (notifications.length <= 1) isNotificationVisible.current = false; }, duration); } else { isNotificationVisible.current = true; } 
             }, []);
             
-            const marketState = useRef({ 
-                visualTicks: [], candles: [], longTermTicks: [], currentValue: 15868, visualValue: 15868, 
-                lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, 
-                structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, 
-                currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
-                ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
-                currentAnchor: 0.75, tradeDuration: 10000,
-                // ADN por defecto
-                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0 } 
-            });
-            const tickHistory = useRef([]); const kinematicState = useRef({ lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 });
-            
-            useEffect(() => { const handleOnline = () => { setIsOnline(true); setNotifications([]); isNotificationVisible.current = false; }; const handleOffline = () => { setIsOnline(false); offlineStartRef.current = Date.now(); }; window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline); return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); }; }, []);
-            
+            // --- NUEVO: FUNCIÓN DE ADN DETERMINISTA ---
+            const generateDNAFromName = (materialIdx, adjectiveIdx) => {
+                // 1. VOLATILIDAD/AGRESIÓN (Basado en Material)
+                // Normalizamos el index de 0 a 1.
+                const normalizedMat = materialIdx / (MATERIALS.length - 1); 
+                // Volatilidad: De 0.5 (Plata) a 2.0 (AX-99)
+                const volatility = 0.5 + (normalizedMat * 1.5);
+                // Agresión (Momentum): De 0.1 (Plata) a 0.8 (AX-99)
+                const aggression = 0.1 + (normalizedMat * 0.7);
+
+                // 2. ESTRUCTURA (Basado en Adjetivo)
+                // Normalizamos el index de 0 a 1.
+                const normalizedAdj = adjectiveIdx / (ADJECTIVES.length - 1);
+                // Estructura (ZigZag): De 0.2 (01) a 0.95 (MAX)
+                // Hacemos una curva para que suba rápido al final
+                const structure = 0.2 + Math.pow(normalizedAdj, 2) * 0.75; 
+
+                // 3. TENDENCIA (Mixta, un poco de azar fijo)
+                // Usamos los indices como seed para algo pseudo-aleatorio pero fijo
+                const seed = (materialIdx * 100) + adjectiveIdx;
+                const pseudoRand = Math.sin(seed) * 0.5 + 0.5; // 0 a 1
+                const trendBias = (pseudoRand - 0.5) * 0.3; // -0.15 a 0.15
+
+                return { volatility, aggression, structure, trendBias };
+            };
+            // -------------------------------------------
+
             const updatePredictor = (newPrice) => { 
-                const state = marketState.current; 
-                tickHistory.current.push(newPrice); 
-                if (tickHistory.current.length > TICK_HISTORY_LIMIT) tickHistory.current.shift(); 
+                // Usamos el ESTADO DEL TAB ACTIVO
+                const state = marketStatesRef.current[activeTab]; 
+                const tickHistory = tickHistoriesRef.current[activeTab];
+                const ks = kinematicsRef.current[activeTab];
+
+                tickHistory.push(newPrice); 
+                if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); 
                 state.longTermTicks.push(newPrice); 
                 if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); 
-                if (tickHistory.current.length < 20) return; 
+                if (tickHistory.length < 20) return; 
                 
-                const ks = kinematicState.current; 
                 const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; 
                 const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; 
                 const acceleration = velocity - ks.lastVelocity; 
-                const n = tickHistory.current.length; 
-                const mean = tickHistory.current.reduce((a, b) => a + b, 0) / n; 
-                const stdDev = Math.sqrt(tickHistory.current.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
+                const n = tickHistory.length; 
+                const mean = tickHistory.reduce((a, b) => a + b, 0) / n; 
+                const stdDev = Math.sqrt(tickHistory.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
                 const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; 
                 
                 const isBuySignalRaw = zScore < -1.6 && velocity < 0 && acceleration > ks.delta; 
@@ -219,24 +266,13 @@
                 
                 const brain = aiBrain.current; 
                 const normalizedDuration = (state.tradeDuration || 10000) / 30000;
-                
-                const inputFeatures = { 
-                    vel: Math.abs(velocity) * 10, 
-                    acc: Math.abs(acceleration) * 100, 
-                    z: Math.abs(zScore),
-                    dur: normalizedDuration 
-                }; 
-                
-                const rawSum = (inputFeatures.vel * brain.weights.velocity) + 
-                               (inputFeatures.acc * brain.weights.acceleration) + 
-                               (inputFeatures.z * brain.weights.zScore) + 
-                               (inputFeatures.dur * brain.weights.duration) + 
-                               brain.weights.bias; 
-                
+                const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration }; 
+                const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias; 
                 const confidence = sigmoid(rawSum); 
-                ks.lastEma = currentEma; 
-                ks.lastVelocity = velocity; 
-                ks.currentFeatures = inputFeatures; 
+                
+                ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; 
+                
+                // Solo actualizamos confianza UI si es el tab activo
                 setAiConfidence(confidence); 
                 
                 if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
@@ -247,15 +283,13 @@
                 } 
             };
 
-            const processMarketLogic = (isWarmup = false) => { 
-                const state = marketState.current; 
-                const dna = state.dna || { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0 }; 
+            const processMarketLogic = (tabIndex, isWarmup = false) => { 
+                const state = marketStatesRef.current[tabIndex]; // PROCESAMOS EL ESTADO DEL TAB ESPECÍFICO
+                const dna = state.dna;
 
-                // 1. CLIMA (PATRONES) CON ADN
                 state.ticksSincePatternChange++; 
                 if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { 
                     state.ticksSincePatternChange = 0; 
-                    
                     const randState = Math.random();
                     const momentumThresh = 0.1 + (dna.aggression * 0.4); 
 
@@ -279,111 +313,164 @@
                     state.nextPatternSwitchTick = state.structTotalDuration; 
                 } 
 
-                // 2. FUERZAS CON ADN
                 let drift = 0; 
                 let volatilityMult = 1.0;
 
                 if (state.patternState === 'MOMENTUM') {
-                    drift = state.momentumDir * 0.8; 
-                    volatilityMult = 2.5; 
-                } 
-                else if (state.patternState === 'STRUCTURED') { 
+                    drift = state.momentumDir * 0.8; volatilityMult = 2.5; 
+                } else if (state.patternState === 'STRUCTURED') { 
                     state.structTimer++; 
                     if (state.structTimer >= state.currentStructLimit) { 
                         state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; 
                         state.structTimer = 0; 
                         state.currentStructLimit = Math.floor((10 + Math.random() * 40) * TICK_RATE); 
                     } 
-                    drift = state.structPhase === 'UP' ? 0.25 : -0.25; 
-                    volatilityMult = 1.0; 
+                    drift = state.structPhase === 'UP' ? 0.25 : -0.25; volatilityMult = 1.0; 
                 } else { 
-                    drift = 0; 
-                    volatilityMult = 0.8; 
+                    drift = 0; volatilityMult = 0.8; 
                 } 
-
                 drift += dna.trendBias; 
 
-                // 3. RUIDO GAUSSIANO
-                const r1 = Math.random();
-                const r2 = Math.random();
-                const noise = (r1 + r2) - 1.0; 
-
-                // 4. MOVIMIENTO FINAL (ADN de Volatilidad)
+                const r1 = Math.random(); const r2 = Math.random(); const noise = (r1 + r2) - 1.0; 
                 const baseVol = state.currentValue * 0.0006; 
                 const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
 
                 state.currentValue += movement; 
-                
                 if (state.currentValue < 10) state.currentValue = 10; 
                 if (isWarmup) state.visualValue = state.currentValue; 
                 state.lastDirection = movement > 0 ? 1 : -1; 
-                updatePredictor(state.currentValue); 
+                
+                // Solo el predictor del activo activo importa para señales, pero todos aprenden
+                if (tabIndex === activeTab) {
+                    updatePredictor(state.currentValue);
+                } else {
+                     // Lógica simplificada para background assets (para no sobrecargar predictor UI)
+                     const tickHistory = tickHistoriesRef.current[tabIndex];
+                     tickHistory.push(state.currentValue);
+                     if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift();
+                }
             };
             
-            const updateVisualCandleLogic = () => { const state = marketState.current; state.visualTicks.push(state.visualValue); if (state.visualTicks.length >= state.ticksPerCandle) { const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; const close = state.visualTicks[state.visualTicks.length - 1]; state.candles.push({ open: lastCandleClose, close, high: Math.max(...state.visualTicks, lastCandleClose), low: Math.min(...state.visualTicks, lastCandleClose), color: close >= lastCandleClose ? '#10b981' : '#f43f5e', }); state.targetScroll = state.candles.length; state.visualTicks = []; if (state.candles.length > 1500) state.candles.shift(); } };
-            const warmUpMarket = (minutes = 10) => { const state = marketState.current; const ticksToSimulate = minutes * 60 * TICK_RATE; for (let i = 0; i < ticksToSimulate; i++) { processMarketLogic(true); updateVisualCandleLogic(); } state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; setCurrentPriceUI(state.visualValue); };
+            const updateVisualCandleLogic = (tabIndex) => { 
+                const state = marketStatesRef.current[tabIndex];
+                state.visualTicks.push(state.visualValue); 
+                if (state.visualTicks.length >= state.ticksPerCandle) { 
+                    const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; 
+                    const close = state.visualTicks[state.visualTicks.length - 1]; 
+                    state.candles.push({ open: lastCandleClose, close, high: Math.max(...state.visualTicks, lastCandleClose), low: Math.min(...state.visualTicks, lastCandleClose), color: close >= lastCandleClose ? '#10b981' : '#f43f5e', }); 
+                    state.targetScroll = state.candles.length; 
+                    state.visualTicks = []; 
+                    if (state.candles.length > 1500) state.candles.shift(); 
+                } 
+            };
+
+            const warmUpMarket = (tabIndex, minutes = 10) => { 
+                const state = marketStatesRef.current[tabIndex];
+                const ticksToSimulate = minutes * 60 * TICK_RATE; 
+                for (let i = 0; i < ticksToSimulate; i++) { 
+                    processMarketLogic(tabIndex, true); 
+                    updateVisualCandleLogic(tabIndex); 
+                } 
+                state.targetScroll = state.candles.length; 
+                state.scrollOffset = state.candles.length; 
+                state.initialized = true;
+            };
             
-            const generateNewAsset = useCallback(() => { 
+            // --- NUEVO: GENERAR ACTIVO ESPECÍFICO ---
+            const generateAssetForTab = useCallback((tabIndex) => {
                 const rand = Math.pow(Math.random(), 2.5); 
                 const newBasePrice = 1000 + (1 - rand) * 99000; 
 
-                // 1. GENERAR ADN DE MERCADO (Personalidad)
-                const dna = {
-                    volatility: 0.5 + Math.random(),        // 0.5 a 1.5
-                    aggression: Math.random(),              // 0 a 1 (Prob Momentum)
-                    structure: Math.random(),               // 0 a 1 (Prob ZigZag)
-                    trendBias: (Math.random() - 0.5) * 0.2  // Tendencia de fondo
-                };
+                // 1. SELECCIÓN DE NOMBRE
+                // Material aleatorio
+                const matIdx = Math.floor(Math.random() * MATERIALS.length);
+                // Adjetivo: Usamos random ponderado para favorecer los índices bajos (menos estructurados)
+                // Math.pow(Math.random(), 2) empuja los resultados hacia 0
+                const adjIdxRaw = Math.floor(Math.pow(Math.random(), 1.5) * ADJECTIVES.length);
+                const adjIdx = Math.min(adjIdxRaw, ADJECTIVES.length - 1);
 
-                // 2. SELECCIONAR DURACIÓN BASADA EN ADN
-                // Activos agresivos/volátiles prefieren tiempos cortos. Estructurados prefieren largos.
+                const material = MATERIALS[matIdx];
+                const adjective = ADJECTIVES[adjIdx];
+                const fullName = `${material} ${adjective}`;
+
+                // 2. ADN DETERMINISTA
+                const dna = generateDNAFromName(matIdx, adjIdx);
+
+                // 3. DURACIÓN BASADA EN ADN
                 let preferredDurations;
-                if (dna.volatility > 1.0 || dna.aggression > 0.6) {
-                    // Perfil "Crypto/Loco" -> Tiempos cortos
-                    preferredDurations = [5000, 5000, 10000, 15000]; // Weighted
-                } else if (dna.structure > 0.6) {
-                    // Perfil "Forex/Stable" -> Tiempos largos
+                if (dna.volatility > 1.2 || dna.aggression > 0.6) {
+                    preferredDurations = [5000, 5000, 10000];
+                } else if (dna.structure > 0.7) {
                     preferredDurations = [15000, 30000, 30000];
                 } else {
-                    // Perfil Balanceado
                     preferredDurations = [5000, 10000, 15000, 30000];
                 }
                 const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
-                
-                setCurrentDuration(randomDuration / 1000); 
 
-                setAssetName(`${materials[Math.floor(Math.random() * materials.length)]} ${adjectives[Math.floor(Math.random() * adjectives.length)]}`); 
-                tickHistory.current = []; 
-                kinematicState.current.lastEma = null; 
-                kinematicState.current.lastVelocity = 0; 
-                
-                marketState.current = { 
-                    ...marketState.current, 
-                    visualTicks: [], 
-                    candles: [], 
-                    longTermTicks: [], 
-                    currentValue: newBasePrice, 
-                    visualValue: newBasePrice, 
-                    lastDirection: 1, 
-                    targetScroll: 0, 
-                    scrollOffset: 0, 
-                    verticalShift: 0, 
-                    currentAnchor: 0.75, 
+                // RESETEAR DATOS DE ESTE TAB
+                tickHistoriesRef.current[tabIndex] = [];
+                kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
+
+                marketStatesRef.current[tabIndex] = {
+                    ...createEmptyState(),
+                    currentValue: newBasePrice,
+                    visualValue: newBasePrice,
                     tradeDuration: randomDuration,
-                    dna: dna // Guardar ADN
-                }; 
-                warmUpMarket(15); 
-            }, []);
+                    dna: dna,
+                    initialized: false
+                };
+
+                warmUpMarket(tabIndex, 15);
+
+                // ACTUALIZAR INFO UI
+                setAssetsInfo(prev => {
+                    const next = [...prev];
+                    next[tabIndex] = { name: fullName, price: newBasePrice, change: 0 };
+                    return next;
+                });
+                
+                // Si es el tab actual, actualizamos estados locales de UI
+                if (tabIndex === activeTab) {
+                    setCurrentDuration(randomDuration / 1000);
+                    // setCurrentPriceUI se actualiza en el loop
+                }
+
+            }, [activeTab]); // Dependencia activeTab solo para lectura
+
+            // Inicializar los 3 activos al principio
+            useEffect(() => {
+                if (!marketStatesRef.current[0].initialized) {
+                    generateAssetForTab(0);
+                    generateAssetForTab(1);
+                    generateAssetForTab(2);
+                }
+            }, [generateAssetForTab]);
+
+            // Manejar cambio de pestaña
+            const handleTabChange = (index) => {
+                setActiveTab(index);
+                const state = marketStatesRef.current[index];
+                setCurrentDuration(state.tradeDuration / 1000);
+                setCurrentPriceUI(state.visualValue);
+                // Reset zoom o mantenerlo? Mantenerlo es mejor UX
+            };
             
-            const handleGenerateAsset = () => { if (isGenerating) return; setIsGenerating(true); setTimeout(() => { generateNewAsset(); setIsGenerating(false); }, 600); };
-            useEffect(() => { generateNewAsset(); }, [generateNewAsset]);
+            const handleGenerateAsset = () => { 
+                if (isGenerating) return; 
+                setIsGenerating(true); 
+                setTimeout(() => { 
+                    generateAssetForTab(activeTab); // REGENERA SOLO EL ACTIVO ACTUAL
+                    setIsGenerating(false); 
+                }, 600); 
+            };
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
                 if (activeTradesRef.current.length >= 4) return;
                 
-                const state = marketState.current; 
-                const ks = kinematicState.current; 
+                const state = marketStatesRef.current[activeTab]; // ESTADO DEL TAB ACTIVO
+                const ks = kinematicsRef.current[activeTab];
+                
                 const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
                 const now = Date.now(); 
                 const duration = state.tradeDuration || 10000;
@@ -396,8 +483,9 @@
                     startTime: now, 
                     expiryTime: now + duration, 
                     amount: INVESTMENT_AMOUNT, 
-                    aiSnapshot: { ...ks.currentFeatures },
-                    duration: duration 
+                    aiSnapshot: { ...ks.currentFeatures }, // Features del momento
+                    duration: duration,
+                    tabIndex: activeTab // GUARDAMOS A QUÉ ACTIVO PERTENECE
                 }; 
                 activeTradesRef.current.push(newTrade); 
                 setActiveTradesUI([...activeTradesRef.current]); 
@@ -408,6 +496,7 @@
                 let animationId;
                 let logicInterval;
                 const LOGIC_RATE_MS = 1000 / TICK_RATE;
+                
                 logicInterval = setInterval(() => {
                     const now = Date.now();
                     if (!navigator.onLine) return;
@@ -415,64 +504,79 @@
                     if (!lastTimeRef.current) lastTimeRef.current = now;
                     const deltaTime = now - lastTimeRef.current;
                     let ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
+                    
                     if (ticksToProcess > 0) {
                         if (ticksToProcess > 2000) { ticksToProcess = 2000; lastTimeRef.current = now; } else { lastTimeRef.current += ticksToProcess * LOGIC_RATE_MS; }
+                        
+                        // PROCESAR LOS 3 MERCADOS SIMULTÁNEAMENTE
                         for (let i = 0; i < ticksToProcess; i++) {
-                            processMarketLogic();
-                            updateVisualCandleLogic();
+                            processMarketLogic(0); updateVisualCandleLogic(0);
+                            processMarketLogic(1); updateVisualCandleLogic(1);
+                            processMarketLogic(2); updateVisualCandleLogic(2);
+                            
+                            // Shadow trades logic (Simplificado para usar solo el activo)
                             if (ticksToProcess < 50 || i % 10 === 0) {
-                                const ks = kinematicState.current;
-                                const state = marketState.current;
-                                
+                                // Solo entrenamos con el tab activo para ahorrar recursos, o podríamos rotar
+                                const state = marketStatesRef.current[activeTab];
+                                const ks = kinematicsRef.current[activeTab];
                                 const currentTicksToWait = Math.floor((state.tradeDuration || 10000) / 1000 * TICK_RATE);
                                 const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
                                 const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
                                 if (isBuy || isSell) {
-                                    aiBrain.current.shadowTrades.push({ 
-                                        entryPrice: state.currentValue, 
-                                        type: isBuy ? 'BUY' : 'SELL', 
-                                        ticksToWait: currentTicksToWait, 
-                                        featuresSnapshot: { ...ks.currentFeatures } 
-                                    });
+                                    aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: currentTicksToWait, featuresSnapshot: { ...ks.currentFeatures } });
                                 }
                                 aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; });
                             }
                         }
                     }
+                    
                     const realNow = Date.now();
+                    // Filtramos trades expirados
                     const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
                     if (expiredTrades.length > 0) {
                         let totalPayout = 0;
-                        const state = marketState.current;
                         expiredTrades.forEach(trade => {
-                            const isWin = trade.type === 'BUY' ? state.visualValue > trade.entryPrice : state.visualValue < trade.entryPrice;
+                            // IMPORTANTE: Chequear contra el precio del activo correcto
+                            const tradeState = marketStatesRef.current[trade.tabIndex];
+                            const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
+                            
                             if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
                             
-                            const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
-                            resultLabelsRef.current.push({
-                                id: Date.now() + Math.random(),
-                                xIndex: currentPreciseIndex,
-                                price: state.visualValue,
-                                profit: isWin ? trade.amount * 0.85 : -trade.amount,
-                                timestamp: Date.now(),
-                                type: isWin ? 'WIN' : 'LOSS'
-                            });
-
-                            if (isWin) { 
-                                totalPayout += trade.amount * 1.85; 
+                            // Solo mostrar etiqueta si estamos viendo ese tab
+                            if (trade.tabIndex === activeTab) {
+                                const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
+                                resultLabelsRef.current.push({
+                                    id: Date.now() + Math.random(),
+                                    xIndex: currentPreciseIndex,
+                                    price: tradeState.visualValue,
+                                    profit: isWin ? trade.amount * 0.85 : -trade.amount,
+                                    timestamp: Date.now(),
+                                    type: isWin ? 'WIN' : 'LOSS'
+                                });
                             }
+
+                            if (isWin) { totalPayout += trade.amount * 1.85; }
                         });
                         activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
                         setActiveTradesUI([...activeTradesRef.current]);
                         if (totalPayout > 0) setBalance(b => b + totalPayout);
                     }
                 }, 100);
+
                 const drawLoop = () => {
                     const now = Date.now();
+                    const state = marketStatesRef.current[activeTab]; // DIBUJAR SOLO TAB ACTIVO
+
                     if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
-                        setCurrentPriceUI(marketState.current.visualValue);
+                        setCurrentPriceUI(state.visualValue);
+                        // Actualizar precios de la lista de activos para los tabs
+                        setAssetsInfo(prev => prev.map((info, idx) => ({
+                            ...info,
+                            price: marketStatesRef.current[idx].visualValue
+                        })));
                         lastUIUpdateRef.current = now;
                     }
+
                     const canvas = canvasRef.current;
                     if (canvas) {
                         const dpr = window.devicePixelRatio || 1;
@@ -480,7 +584,7 @@
                         const height = canvas.height / dpr;
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                        const state = marketState.current;
+                        
                         const priceSmoothing = 0.3;
                         state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing;
                         const horizontalSmoothing = 0.2;
@@ -492,8 +596,9 @@
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
                         const candleWidth = width / zoom;
                         
+                        // Lógica de cámara (Horizontal/Vertical) usa state
                         let targetAnchorPercent = 0.75;
-                        const activeTrades = activeTradesRef.current;
+                        const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); // Solo trades de este tab afectan la cámara
                         if (activeTrades.length > 0) {
                             const maxDuration = Math.max(...activeTrades.map(t => t.duration));
                             if (maxDuration >= 30000) targetAnchorPercent = 0.50;
@@ -542,7 +647,7 @@
                         const xFuture = getX(futureIndex);
                         const xCurrent = getX(currentPreciseIndex);
                         
-                        ctx.strokeStyle = activeTradesRef.current.length > 0 ? '#333' : '#666'; 
+                        ctx.strokeStyle = activeTrades.length > 0 ? '#333' : '#666'; 
                         ctx.lineWidth = 1;
                         ctx.setLineDash([2, 4]);
                         ctx.beginPath();
@@ -575,7 +680,8 @@
                             ctx.shadowBlur = 0;
                         });
 
-                        activeTradesRef.current.forEach(trade => {
+                        // DIBUJAR SOLO TRADES DE ESTE TAB
+                        activeTrades.forEach(trade => {
                             const yEntry = getY(trade.entryPrice);
                             const xEntry = getX(trade.entryIndex);
                             const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
@@ -659,7 +765,7 @@
                     clearInterval(logicInterval);
                     cancelAnimationFrame(animationId);
                 };
-            }, [zoom, addNotification]);
+            }, [zoom, addNotification, activeTab]); // Redibujar si cambia tab
 
             useEffect(() => {
                 const container = containerRef.current;
@@ -695,10 +801,30 @@
                             <div className="opacity-50 text-[10px] font-normal leading-tight">BALANCE GLOBAL</div>
                             <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-green-500 animate-pulse' : 'bg-[#D9D9D9]'}`} />
-                            <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetName}</div>
+
+                        {/* DESKTOP TABS SYSTEM */}
+                        <div className="hidden md:flex items-center gap-2 pointer-events-auto bg-black/40 backdrop-blur-md p-1 rounded-2xl">
+                            {assetsInfo.map((info, idx) => (
+                                <div 
+                                    key={idx}
+                                    onClick={() => handleTabChange(idx)}
+                                    className={`glass-tab px-4 py-2 flex items-center gap-3 ${activeTab === idx ? 'active' : 'opacity-60'}`}
+                                >
+                                    <div className={`w-2 h-2 rounded-full ${activeTab === idx ? 'bg-green-500 shadow-[0_0_10px_#10b981]' : 'bg-gray-500'}`} />
+                                    <div className="flex flex-col">
+                                        <div className="text-xs font-bold text-white leading-none">{info.name}</div>
+                                        <div className="text-[10px] text-white/70 font-mono leading-none mt-1">${info.price.toFixed(2)}</div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
+
+                        {/* MOBILE TITLE (SIMPLE) */}
+                        <div className="flex md:hidden items-center gap-2">
+                             <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-green-500 animate-pulse' : 'bg-[#D9D9D9]'}`} />
+                             <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetsInfo[activeTab].name}</div>
+                        </div>
+
                         <div className="flex flex-col justify-center items-end gap-2">
                             <div className="opacity-50 text-[10px] font-normal leading-tight">MERCADO EN VIVO</div>
                             <div className="text-sm font-normal leading-tight">${currentPriceUI.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
@@ -735,6 +861,10 @@
                         })}
 
                         {activeTradesUI.map(trade => {
+                            // Si estamos en desktop, mostrar qué activo es
+                            const isCurrentTab = trade.tabIndex === activeTab;
+                            const tradeAsset = assetsInfo[trade.tabIndex].name;
+
                             const isBuy = trade.type === 'BUY';
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
                             const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
@@ -746,7 +876,9 @@
                                         <img src={icon} className="w-5 h-5 brightness-0 invert" />
                                     </div>
                                     <div className="flex flex-col justify-center items-start gap-1.5">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">OPERACIÓN ABIERTA</div>
+                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
+                                            {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
+                                        </div>
                                         <div className="text-white text-sm font-medium font-sans leading-none uppercase">
                                             {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
                                         </div>
@@ -772,10 +904,10 @@
                     <div className="absolute bottom-6 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
                         <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                             
-                            {/* 1. EXPLORAR */}
+                            {/* 1. EXPLORAR (ANCHO AJUSTADO Y TEXTO DINÁMICO) */}
                             <button 
                                 onClick={handleGenerateAsset} 
-                                className={`glass-button w-full md:w-56 h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                                className={`glass-button w-full md:w-[280px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
                             >
                                 <div className="w-5 h-5 flex items-center justify-center">
                                     <img 
@@ -784,9 +916,13 @@
                                     />
                                 </div>
                                 <div className="flex flex-col items-start gap-1">
-                                    <div className="opacity-60 text-white text-[10px] font-normal">NUEVO ACTIVO</div>
-                                    <div className="text-white text-sm font-normal">
-                                        {isGenerating ? 'BUSCANDO...' : 'EXPLORAR ACTIVOS'}
+                                    <div className="opacity-60 text-white text-[10px] font-normal uppercase">
+                                        {isMobile ? 'EXPLORACIÓN' : 'EXPLORAR'}
+                                    </div>
+                                    <div className="text-white text-sm font-normal uppercase whitespace-nowrap">
+                                        {isGenerating 
+                                            ? 'BUSCANDO...' 
+                                            : (isMobile ? 'PRÓXIMO ACTIVO' : 'RENOVAR ACTIVOS')}
                                     </div>
                                 </div>
                             </button>

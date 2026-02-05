@@ -13,10 +13,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        @font-face { font-family: 'BDO Grotesk'; src: local('BDO Grotesk'), url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Regular.woff') format('woff'); font-weight: 400; }
-        @font-face { font-family: 'BDO Grotesk'; src: local('BDO Grotesk Medium'), url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Medium.woff') format('woff'); font-weight: 500; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Regular.woff') format('woff'); font-weight: 400; font-display: swap; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Medium.woff') format('woff'); font-weight: 500; font-display: swap; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Bold.woff') format('woff'); font-weight: 700; font-display: swap; }
 
-        body { margin: 0; background-color: #050505; color: white; font-family: 'BDO Grotesk', 'Space Grotesk', sans-serif; overflow: hidden; touch-action: none; }
+        * { font-family: 'BDO Grotesk', sans-serif !important; }
+        body { margin: 0; background-color: #050505; color: white; font-family: 'BDO Grotesk', sans-serif; overflow: hidden; touch-action: none; }
         @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
         

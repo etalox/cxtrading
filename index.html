@@ -232,15 +232,19 @@
             };
 
             const updatePredictor = (newPrice) => { 
+                const updatePredictor = (newPrice) => { 
                 const state = marketStatesRef.current[activeTab]; 
                 const tickHistory = tickHistoriesRef.current[activeTab];
                 const ks = kinematicsRef.current[activeTab];
+                
                 tickHistory.push(newPrice); 
                 if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); 
                 state.longTermTicks.push(newPrice); 
-                if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); 
+                if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); // Historial largo para tendencia
+                
                 if (tickHistory.length < 20) return; 
                 
+                // 1. Cálculos Base (Igual que antes)
                 const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; 
                 const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; 
                 const acceleration = velocity - ks.lastVelocity; 
@@ -248,33 +252,78 @@
                 const mean = tickHistory.reduce((a, b) => a + b, 0) / n; 
                 const stdDev = Math.sqrt(tickHistory.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
                 const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; 
+
+                // 2. NUEVO: Contexto de Tendencia (SMA 50 aprox)
+                const longTermMean = state.longTermTicks.length > 0 
+                    ? state.longTermTicks.reduce((a, b) => a + b, 0) / state.longTermTicks.length 
+                    : mean;
+                const trendDirection = newPrice > longTermMean ? 1 : -1; // 1 = Alcista, -1 = Bajista
+
+                // 3. NUEVO: Umbrales Dinámicos según DNA (Personalidad del activo)
+                const aggression = state.dna ? state.dna.aggression : 0.5;
+                // Activos agresivos necesitan señales más extremas para revertir
+                const zThreshold = 1.6 + (aggression * 0.5); 
                 
-                const isBuySignalRaw = zScore < -1.6 && velocity < 0 && acceleration > ks.delta; 
-                const isSellSignalRaw = zScore > 1.6 && velocity > 0 && acceleration < -ks.delta; 
-                let finalBuy = isBuySignalRaw; let finalSell = isSellSignalRaw; 
+                // 4. Lógica Mejorada: Pullback vs Reversión Extrema
+                // Señal de COMPRA:
+                // A) Reversión fuerte: Precio muy bajo (zScore < -Threshold) Y frenando caída (acc > 0)
+                // B) Pullback a favor de tendencia: Precio bajó un poco (zScore < -1) PERO tendencia es alcista
+                const isOversold = zScore < -zThreshold;
+                const isPullbackBuy = trendDirection === 1 && zScore < -1.0 && velocity < 0 && acceleration > 0;
+                const isBuySignalRaw = (isOversold && acceleration > ks.delta) || isPullbackBuy;
+
+                // Señal de VENTA:
+                const isOverbought = zScore > zThreshold;
+                const isPullbackSell = trendDirection === -1 && zScore > 1.0 && velocity > 0 && acceleration < 0;
+                const isSellSignalRaw = (isOverbought && acceleration < -ks.delta) || isPullbackSell;
+
+                let finalBuy = isBuySignalRaw; 
+                let finalSell = isSellSignalRaw; 
                 
+                // IA / Aprendizaje (Mantenemos tu lógica existente)
                 const brain = aiBrain.current; 
                 const normalizedDuration = (state.tradeDuration || 10000) / 30000;
-                const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration }; 
+                const inputFeatures = { 
+                    vel: Math.abs(velocity) * 10, 
+                    acc: Math.abs(acceleration) * 100, 
+                    z: Math.abs(zScore), 
+                    dur: normalizedDuration,
+                    trend: trendDirection // Podrías agregar esto al brain en el futuro
+                }; 
+                
                 const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias; 
                 const confidence = sigmoid(rawSum); 
-                ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; 
+                
+                ks.lastEma = currentEma; 
+                ks.lastVelocity = velocity; 
+                ks.currentFeatures = inputFeatures; 
                 setAiConfidence(confidence); 
                 
+                // Disparo de Señal (Trigger)
                 if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
-                    if (Math.random() < 0.1) { 
+                    // Filtro de Confianza IA: Solo disparar si la IA "aprueba" o si es aleatorio para exploración
+                    // Aumentamos ligeramente la exigencia
+                    if (Math.random() < 0.15 || confidence > 0.7) { 
                         const signalType = finalBuy ? 'BUY' : 'SELL';
-                        addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
-                        state.lastSignalTick = state.currentValue;
-                        if (autopilot && confidence > 0.6 && activeTradesRef.current.length === 0) {
-                            const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
-                            if (lastSignalRef.current !== currentSignal) { 
-                                lastSignalRef.current = currentSignal;
-                                setTimeout(() => executeTrade(signalType), 100); 
+                        
+                        // Evitar señales repetidas muy seguidas
+                        const timeSinceLast = Date.now() - (state.lastSignalTime || 0);
+                        if (timeSinceLast > 2000) { 
+                            addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
+                            state.lastSignalTick = state.currentValue;
+                            state.lastSignalTime = Date.now(); // Guardar tiempo
+
+                            if (autopilot && confidence > 0.65 && activeTradesRef.current.length === 0) {
+                                const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
+                                if (lastSignalRef.current !== currentSignal) { 
+                                    lastSignalRef.current = currentSignal;
+                                    setTimeout(() => executeTrade(signalType), 100); 
+                                }
                             }
                         }
                     } 
                 } 
+            };
             };
 
             const processMarketLogic = (tabIndex, isWarmup = false) => { 

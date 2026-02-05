@@ -22,11 +22,15 @@
         @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
         
-        .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 40px; }
-        .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 40px; transition: all 0.2s ease; }
+        /* AJUSTE: Radio de contenedor a 30px */
+        .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 30px; }
+        
+        /* AJUSTE: Radio de botones a 20px */
+        .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 20px; transition: all 0.2s ease; }
         .glass-button:active { transform: scale(0.96); }
         
-        .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 40px; }
+        /* Tabs Estilo Caja (Radio 16px) */
+        .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 16px; }
         .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
         .toggle-switch { position: relative; width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; transition: background 0.3s; }
@@ -107,44 +111,20 @@
                 const container = containerRef.current;
                 if (!container) return () => window.removeEventListener('resize', updateMobile);
                 const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
-                
-                // 1. LÓGICA DE SCROLL INVERTIDA Y MÁXIMO 500
                 const onWheel = (e) => {
                     if (isInteractive(e.target)) return;
                     e.preventDefault();
                     const delta = -e.deltaY;
-                    // INVERTIDO: Scroll UP (delta > 0) -> Zoom IN (factor < 1 para reducir el valor de zoom)
-                    // Recordemos: Menor valor de 'zoom' state = Velas más grandes (Zoom In)
-                    //             Mayor valor de 'zoom' state = Más velas visibles (Zoom Out)
-                    // Espera, la lógica original era: candleWidth = width / zoom;
-                    // Si zoom aumenta -> candleWidth disminuye -> Zoom OUT.
-                    // Si zoom disminuye -> candleWidth aumenta -> Zoom IN.
-                    
-                    // Queremos Scroll UP -> Zoom IN.
-                    // Scroll UP -> delta > 0.
-                    // Para Zoom IN, necesitamos REDUCIR 'zoom'. Factor < 1.
                     const factor = delta > 0 ? 0.94 : 1.06;
-                    
                     setZoom(z => Math.max(80, Math.min(500, Math.round(z * factor))));
                 };
-                
                 let touchActive = false;
                 const onTouchStart = (e) => {
                     if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
                 };
                 const onTouchMove = (e) => {
                     if (!touchActive) return;
-                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) { 
-                        if (isInteractive(lastTouchTargetRef.current)) return; 
-                        e.preventDefault(); 
-                        const dx = e.touches[0].clientX - e.touches[1].clientX; 
-                        const dy = e.touches[0].clientY - e.touches[1].clientY; 
-                        const dist = Math.hypot(dx, dy); 
-                        const ratio = (pinchStartRef.current || dist) / dist; 
-                        pinchStartRef.current = dist; 
-                        // Máximo actualizado a 500
-                        setZoom(z => Math.max(80, Math.min(500, Math.round(z * ratio)))); 
-                    }
+                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) { if (isInteractive(lastTouchTargetRef.current)) return; e.preventDefault(); const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const dist = Math.hypot(dx, dy); const ratio = (pinchStartRef.current || dist) / dist; pinchStartRef.current = dist; setZoom(z => Math.max(80, Math.min(500, Math.round(z * ratio)))); }
                 };
                 const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
                 container.addEventListener('wheel', onWheel, { passive: false });
@@ -684,7 +664,6 @@
                 return () => resizeObserver.disconnect();
             }, []);
 
-            // 3. ACTUALIZAR PORCENTAJE DEL SLIDER PARA REFLEJAR NUEVO MAX (500)
             const sliderPercentage = ((zoom - 80) / (500 - 80)) * 100;
 
             const maxTrades = autopilot ? 1 : 4;
@@ -701,6 +680,7 @@
                             <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
                         </div>
 
+                        {/* --- TABS ESTILO CAJA (Restaurado) --- */}
                         <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
                             {assetsInfo.map((info, idx) => {
                                 const isActive = activeTab === idx;
@@ -710,6 +690,7 @@
                                         onClick={() => handleTabChange(idx)}
                                         className={`
                                             tab-item h-[60px] px-10 flex items-center justify-center gap-[10px]
+                                            ${isActive ? 'border border-white' : 'border border-white/40'}
                                             overflow-hidden
                                         `}
                                     >
@@ -781,7 +762,7 @@
                             const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
 
                             return (
-                                <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[40px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
+                                <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
                                     <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
                                         <img src={icon} className="w-5 h-5 brightness-0 invert" />
                                     </div>
@@ -863,7 +844,7 @@
                                 <button 
                                     onClick={() => executeTrade('BUY')} 
                                     disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <img src={ICONS.trendingUp} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">
@@ -875,7 +856,7 @@
                                 <button 
                                     onClick={() => executeTrade('SELL')} 
                                     disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <img src={ICONS.trendingDown} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">

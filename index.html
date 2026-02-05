@@ -455,7 +455,7 @@
                 kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
                 marketStatesRef.current[tabIndex] = { ...createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
                 
-                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 5; 
+                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15; 
                 warmUpMarket(tabIndex, randomWarmupMinutes);
                 setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
                 if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }

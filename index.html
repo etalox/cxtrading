@@ -131,17 +131,39 @@
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
             
             const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
-            const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
             
-            // Nueva Ref para etiquetas temporales (Popups en el gráfico)
+            // AI BRAIN ACTUALIZADO CON DURATION
+            const aiBrain = useRef({ 
+                weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, // Duration weight added
+                learningRate: 0.05, 
+                history: [], 
+                shadowTrades: [] 
+            });
+            
             const resultLabelsRef = useRef([]);
 
             const sigmoid = (x) => 1 / (1 + Math.exp(-x));
-            const trainAI = (features, actualOutcome) => { const brain = aiBrain.current; const rawSum = (features.vel * brain.weights.velocity) + (features.acc * brain.weights.acceleration) + (features.z * brain.weights.zScore) + brain.weights.bias; const predictedConfidence = sigmoid(rawSum); const error = actualOutcome - predictedConfidence; brain.weights.velocity += brain.learningRate * error * features.vel; brain.weights.acceleration += brain.learningRate * error * features.acc; brain.weights.zScore += brain.learningRate * error * features.z; brain.weights.bias += brain.learningRate * error; setAiLearnedCount(c => c + 1); };
+            
+            // trainAI ACTUALIZADO
+            const trainAI = (features, actualOutcome) => { 
+                const brain = aiBrain.current; 
+                const rawSum = (features.vel * brain.weights.velocity) + 
+                               (features.acc * brain.weights.acceleration) + 
+                               (features.z * brain.weights.zScore) + 
+                               (features.dur * brain.weights.duration) + 
+                               brain.weights.bias; 
+                const predictedConfidence = sigmoid(rawSum); 
+                const error = actualOutcome - predictedConfidence; 
+                brain.weights.velocity += brain.learningRate * error * features.vel; 
+                brain.weights.acceleration += brain.learningRate * error * features.acc; 
+                brain.weights.zScore += brain.learningRate * error * features.z; 
+                brain.weights.duration += brain.learningRate * error * features.dur; // Learning Duration
+                brain.weights.bias += brain.learningRate * error; 
+                setAiLearnedCount(c => c + 1); 
+            };
             
             const addNotification = useCallback((data) => { 
                 if (data.type === 'SIGNAL' && isNotificationVisible.current) return; 
-                // FILTRO: Ya no mostramos WIN/LOSS en notificaciones, solo señales o sistema
                 if (data.type === 'WIN' || data.type === 'LOSS') return;
 
                 const id = Date.now() + Math.random(); 
@@ -166,7 +188,63 @@
             
             useEffect(() => { const handleOnline = () => { setIsOnline(true); setNotifications([]); isNotificationVisible.current = false; }; const handleOffline = () => { setIsOnline(false); offlineStartRef.current = Date.now(); }; window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline); return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); }; }, []);
             
-            const updatePredictor = (newPrice) => { const state = marketState.current; tickHistory.current.push(newPrice); if (tickHistory.current.length > TICK_HISTORY_LIMIT) tickHistory.current.shift(); state.longTermTicks.push(newPrice); if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); if (tickHistory.current.length < 20) return; const ks = kinematicState.current; const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; const acceleration = velocity - ks.lastVelocity; const n = tickHistory.current.length; const mean = tickHistory.current.reduce((a, b) => a + b, 0) / n; const stdDev = Math.sqrt(tickHistory.current.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; let majorTrend = 0; if (state.longTermTicks.length > 500) { const diff = state.longTermTicks[state.longTermTicks.length - 1] - state.longTermTicks[0]; if (diff > 40) majorTrend = 1; if (diff < -40) majorTrend = -1; } const isBuySignalRaw = zScore < -1.6 && velocity < 0 && acceleration > ks.delta; const isSellSignalRaw = zScore > 1.6 && velocity > 0 && acceleration < -ks.delta; let finalBuy = isBuySignalRaw; let finalSell = isSellSignalRaw; if (majorTrend === -1 && isBuySignalRaw && zScore > -2.2) finalBuy = false; if (majorTrend === 1 && isSellSignalRaw && zScore < 2.2) finalSell = false; const brain = aiBrain.current; const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore) }; const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + brain.weights.bias; const confidence = sigmoid(rawSum); ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; setAiConfidence(confidence); if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { if (Math.random() < 0.1) { addNotification({ type: 'SIGNAL', signalType: finalBuy ? 'BUY' : 'SELL', confidence: confidence, price: newPrice }); state.lastSignalTick = state.currentValue; } } };
+            const updatePredictor = (newPrice) => { 
+                const state = marketState.current; 
+                tickHistory.current.push(newPrice); 
+                if (tickHistory.current.length > TICK_HISTORY_LIMIT) tickHistory.current.shift(); 
+                state.longTermTicks.push(newPrice); 
+                if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); 
+                if (tickHistory.current.length < 20) return; 
+                
+                const ks = kinematicState.current; 
+                const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; 
+                const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; 
+                const acceleration = velocity - ks.lastVelocity; 
+                const n = tickHistory.current.length; 
+                const mean = tickHistory.current.reduce((a, b) => a + b, 0) / n; 
+                const stdDev = Math.sqrt(tickHistory.current.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
+                const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; 
+                let majorTrend = 0; 
+                if (state.longTermTicks.length > 500) { const diff = state.longTermTicks[state.longTermTicks.length - 1] - state.longTermTicks[0]; if (diff > 40) majorTrend = 1; if (diff < -40) majorTrend = -1; } 
+                
+                const isBuySignalRaw = zScore < -1.6 && velocity < 0 && acceleration > ks.delta; 
+                const isSellSignalRaw = zScore > 1.6 && velocity > 0 && acceleration < -ks.delta; 
+                let finalBuy = isBuySignalRaw; 
+                let finalSell = isSellSignalRaw; 
+                if (majorTrend === -1 && isBuySignalRaw && zScore > -2.2) finalBuy = false; 
+                if (majorTrend === 1 && isSellSignalRaw && zScore < 2.2) finalSell = false; 
+                
+                // --- UPDATE PREDICTOR CON DURATION ---
+                const brain = aiBrain.current; 
+                const normalizedDuration = (state.tradeDuration || 10000) / 30000;
+                
+                const inputFeatures = { 
+                    vel: Math.abs(velocity) * 10, 
+                    acc: Math.abs(acceleration) * 100, 
+                    z: Math.abs(zScore),
+                    dur: normalizedDuration 
+                }; 
+                
+                const rawSum = (inputFeatures.vel * brain.weights.velocity) + 
+                               (inputFeatures.acc * brain.weights.acceleration) + 
+                               (inputFeatures.z * brain.weights.zScore) + 
+                               (inputFeatures.dur * brain.weights.duration) + 
+                               brain.weights.bias; 
+                
+                const confidence = sigmoid(rawSum); 
+                ks.lastEma = currentEma; 
+                ks.lastVelocity = velocity; 
+                ks.currentFeatures = inputFeatures; 
+                setAiConfidence(confidence); 
+                
+                if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
+                    if (Math.random() < 0.1) { 
+                        addNotification({ type: 'SIGNAL', signalType: finalBuy ? 'BUY' : 'SELL', confidence: confidence, price: newPrice }); 
+                        state.lastSignalTick = state.currentValue; 
+                    } 
+                } 
+            };
+
             const processMarketLogic = (isWarmup = false) => { const state = marketState.current; const volFactor = state.currentValue * 0.002; state.ticksSincePatternChange++; if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { state.ticksSincePatternChange = 0; if (state.patternState === 'NORMAL') { state.patternState = 'STRUCTURED'; state.structTotalDuration = Math.floor(120 + Math.random() * 240); state.nextPatternSwitchTick = state.structTotalDuration; state.structElapsed = 0; state.structPeriodX = Math.floor((5 + Math.random() * 20) * TICK_RATE); state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN'; state.structTimer = 0; state.currentStructLimit = state.structPeriodX; } else { state.patternState = 'NORMAL'; state.nextPatternSwitchTick = Math.floor(240 + Math.random() * 240); state.targetProb = 0.5; state.probStep = 0; } } let direction = state.lastDirection; if (state.patternState === 'STRUCTURED') { state.structTimer++; if (state.structTimer >= state.currentStructLimit) { state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; state.structTimer = 0; state.currentStructLimit = Math.floor((5 + Math.random() * 20) * TICK_RATE); } const targetDir = state.structPhase === 'UP' ? 1 : -1; direction = (Math.random() < 0.75) ? targetDir : -targetDir; } else { state.cycleCounter++; if (state.cycleCounter >= state.cycleDuration) { state.cycleCounter = 0; const changeRoll = Math.random(); let newTarget = 0.5; if (changeRoll < 0.6) { const d = Math.random() > 0.5 ? 1 : -1; newTarget = (d === 1) ? 0.65 : 0.35; } state.targetProb = newTarget; state.probStep = (state.targetProb - state.currentProb) / state.cycleDuration; } state.currentProb += state.probStep; direction = (Math.random() > state.currentProb) ? -state.lastDirection : state.lastDirection; } state.currentValue += direction * (volFactor * (0.5 + Math.random())); if (state.currentValue < 10) state.currentValue = 10; if (isWarmup) state.visualValue = state.currentValue; state.lastDirection = direction; updatePredictor(state.currentValue); };
             const updateVisualCandleLogic = () => { const state = marketState.current; state.visualTicks.push(state.visualValue); if (state.visualTicks.length >= state.ticksPerCandle) { const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; const close = state.visualTicks[state.visualTicks.length - 1]; state.candles.push({ open: lastCandleClose, close, high: Math.max(...state.visualTicks, lastCandleClose), low: Math.min(...state.visualTicks, lastCandleClose), color: close >= lastCandleClose ? '#10b981' : '#f43f5e', }); state.targetScroll = state.candles.length; state.visualTicks = []; if (state.candles.length > 1500) state.candles.shift(); } };
             const warmUpMarket = (minutes = 10) => { const state = marketState.current; const ticksToSimulate = minutes * 60 * TICK_RATE; for (let i = 0; i < ticksToSimulate; i++) { processMarketLogic(true); updateVisualCandleLogic(); } state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; setCurrentPriceUI(state.visualValue); };
@@ -204,7 +282,7 @@
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
-                if (activeTradesRef.current.length >= 4) return; // LÍMITE DE 4 TRADES
+                if (activeTradesRef.current.length >= 4) return;
                 
                 const state = marketState.current; 
                 const ks = kinematicState.current; 
@@ -247,10 +325,19 @@
                             if (ticksToProcess < 50 || i % 10 === 0) {
                                 const ks = kinematicState.current;
                                 const state = marketState.current;
+                                
+                                // --- SHADOW TRADES CON DURATION REAL ---
+                                const currentTicksToWait = Math.floor((state.tradeDuration || 10000) / 1000 * TICK_RATE);
+
                                 const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
                                 const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
                                 if (isBuy || isSell) {
-                                    aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: 20, featuresSnapshot: { ...ks.currentFeatures } });
+                                    aiBrain.current.shadowTrades.push({ 
+                                        entryPrice: state.currentValue, 
+                                        type: isBuy ? 'BUY' : 'SELL', 
+                                        ticksToWait: currentTicksToWait, 
+                                        featuresSnapshot: { ...ks.currentFeatures } 
+                                    });
                                 }
                                 aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; });
                             }
@@ -265,7 +352,6 @@
                             const isWin = trade.type === 'BUY' ? state.visualValue > trade.entryPrice : state.visualValue < trade.entryPrice;
                             if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
                             
-                            // AÑADIR ETIQUETA FLOTANTE DE RESULTADO
                             const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
                             resultLabelsRef.current.push({
                                 id: Date.now() + Math.random(),
@@ -354,14 +440,12 @@
                         ctx.stroke();
                         ctx.setLineDash([]);
                         
-                        // LÍNEA DE PREVISUALIZACIÓN DE DURACIÓN
                         const previewDuration = state.tradeDuration || 10000;
                         const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
                         const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
                         const xFuture = getX(futureIndex);
                         const xCurrent = getX(currentPreciseIndex);
                         
-                        // Si hay trades activos, la línea es gris suave, si no, es blanca tenue
                         ctx.strokeStyle = activeTradesRef.current.length > 0 ? '#333' : '#666'; 
                         ctx.lineWidth = 1;
                         ctx.setLineDash([2, 4]);
@@ -370,7 +454,6 @@
                         ctx.lineTo(xFuture, currentY);
                         ctx.stroke();
                         
-                        // Línea vertical final de previsualización
                         ctx.beginPath();
                         ctx.moveTo(xFuture, currentY - 20);
                         ctx.lineTo(xFuture, currentY + 20);
@@ -428,29 +511,24 @@
                             ctx.fill();
                         });
 
-                        // DIBUJAR ETIQUETAS DE RESULTADO ANIMADAS
-                        resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); // 2 segundos de vida
+                        resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); 
                         resultLabelsRef.current.forEach(label => {
                             const age = Date.now() - label.timestamp;
                             const progress = age / 2000;
-                            const yPos = getY(label.price) - 30 - (progress * 50); // Sube 50px
+                            const yPos = getY(label.price) - 30 - (progress * 50); 
                             const xPos = getX(label.xIndex);
-                            const opacity = 1 - Math.pow(progress, 3); // Fade out
+                            const opacity = 1 - Math.pow(progress, 3); 
 
                             ctx.globalAlpha = opacity;
                             const bg = label.type === 'WIN' ? '#10B981' : '#F43F5E';
                             
-                            // Definir color de sombra dinámico
-                            const shadowColor = label.type === 'WIN' 
-                                ? 'rgba(16, 185, 129, 0.40)'  // Sombra verde para WIN
-                                : 'rgba(244, 63, 94, 0.40)';  // Sombra roja para LOSS
+                            // SHADOW COLOR DINÁMICO (CORREGIDO)
+                            const shadowColor = label.type === 'WIN' ? 'rgba(16, 185, 129, 0.40)' : 'rgba(244, 63, 94, 0.40)';
 
-                            // Replicar diseño de Figma
                             ctx.fillStyle = bg;
                             ctx.shadowBlur = 20;
                             ctx.shadowColor = shadowColor;
-
-                            // Rectángulo redondeado
+                            
                             const labelW = 100;
                             const labelH = 40;
                             ctx.beginPath();
@@ -458,8 +536,7 @@
                             ctx.fill();
                             ctx.shadowBlur = 0;
 
-                            // Texto
-                            ctx.fillStyle = '#000000'; // Texto negro
+                            ctx.fillStyle = '#000000'; 
                             ctx.font = '500 14px "BDO Grotesk", sans-serif';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';

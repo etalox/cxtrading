@@ -302,13 +302,13 @@
                         const priceRange = targetYMax - targetYMin;
                         const pixelsPerPrice = pixelHeight / priceRange;
                         const rawY = pixelHeight - ((state.visualValue - targetYMin) / (targetYMax - targetYMin)) * pixelHeight;
-                        const safeZoneBottom = Math.min(height - 180, height * 0.75);
+                        const safeZoneBottom = Math.min(height - 250, height * 0.65);
                         let neededShift = 0;
                         if (rawY > safeZoneBottom) {
                             const pixelsOff = rawY - safeZoneBottom;
                             neededShift = pixelsOff / pixelsPerPrice;
                         }
-                        state.verticalShift += (neededShift - state.verticalShift) * 0.1;
+                        state.verticalShift += (neededShift - state.verticalShift) * 0.2;
                         const yMax = targetYMax - state.verticalShift;
                         const yMin = targetYMin - state.verticalShift;
                         

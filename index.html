@@ -922,7 +922,8 @@
             const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= maxTrades;
 
             return (
-                <div className="flex flex-col h-screen relative bg-[#050505] text-white font-sans overflow-hidden">
+                // Usamos estilo inline o clase arbitraria de Tailwind para dvh
+            <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
                     <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
                         <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
                     </div>
@@ -1052,7 +1053,7 @@
                          </div>
                     </div>
 
-                    <div className="absolute bottom-6 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
+                    <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
                         <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                             
                             <button 

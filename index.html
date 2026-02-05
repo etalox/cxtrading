@@ -999,12 +999,16 @@
                                 <div 
                                     key={note.id} 
                                     onClick={() => handleNotificationClick(note)}
-                                    className={`glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''}`}
+                                    className={`glass-panel !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/50 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''}`}
                                 >
-                                    <img src={iconSrc} className={iconClass} style={iconStyle} />
+
+                                    <div className="w-12 h-12 border border-white/50 rounded-[15px] flex items-center justify-center shrink-0">
+                                        <img src={iconSrc} className={`${iconClass} animate-pulse`} style={iconStyle} />
+                                    </div>
+
                                     <div className="flex flex-col justify-center items-start gap-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                            {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'NOTIFICACIÓN'}
+                                            {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
                                         </div>
                                         <div className="text-sm font-medium">
                                             {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
@@ -1039,7 +1043,7 @@
                                     {/* Fila Inferior: Estado + Contador alineados */}
                                     <div className="flex items-baseline justify-start w-full gap-4">
                                         <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                            {isBuy ? 'COMPRANDO... ' : 'VENDIENDO... '}
+                                            {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
                                         </div>
                                         {/* Contador movido aquí dentro */}
                                         <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">

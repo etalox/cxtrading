@@ -326,7 +326,7 @@
             };
             };
 
-            const processMarketLogic = (tabIndex, isWarmup = false) => { 
+                        const processMarketLogic = (tabIndex, isWarmup = false) => { 
                 const state = marketStatesRef.current[tabIndex]; 
                 const dna = state.dna;
                 state.ticksSincePatternChange++; 
@@ -353,8 +353,13 @@
                     }
                     state.nextPatternSwitchTick = state.structTotalDuration; 
                 } 
+                
                 let drift = 0; let volatilityMult = 1.0;
-                if (state.patternState === 'MOMENTUM') { drift = state.momentumDir * 0.8; volatilityMult = 2.5; } 
+                
+                if (state.patternState === 'MOMENTUM') { 
+                    drift = state.momentumDir * 0.6; // Reducido al 75%
+                    volatilityMult = 2.5; 
+                } 
                 else if (state.patternState === 'STRUCTURED') { 
                     state.structTimer++; 
                     if (state.structTimer >= state.currentStructLimit) { 
@@ -362,12 +367,18 @@
                         state.structTimer = 0; 
                         state.currentStructLimit = Math.floor((10 + Math.random() * 40) * TICK_RATE); 
                     } 
-                    drift = state.structPhase === 'UP' ? 0.25 : -0.25; volatilityMult = 1.0; 
-                } else { drift = 0; volatilityMult = 0.8; } 
+                    drift = state.structPhase === 'UP' ? 0.18 : -0.18; // Reducido al 75%
+                    volatilityMult = 1.0; 
+                } else { 
+                    drift = 0; 
+                    volatilityMult = 0.8; 
+                } 
+                
                 drift += dna.trendBias; 
                 const r1 = Math.random(); const r2 = Math.random(); const noise = (r1 + r2) - 1.0; 
                 const baseVol = state.currentValue * 0.0006; 
                 const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
+                
                 if (dna.isStepped && state.patternState !== 'MOMENTUM') {
                     state.stepBuffer = (state.stepBuffer || 0) + movement;
                     if (state.ticksSincePatternChange % 8 === 0) {
@@ -377,9 +388,11 @@
                 } else {
                     state.currentValue += movement; 
                 }
+                
                 if (state.currentValue < 10) state.currentValue = 10; 
                 if (isWarmup) state.visualValue = state.currentValue; 
                 state.lastDirection = movement > 0 ? 1 : -1; 
+                
                 if (tabIndex === activeTab) { updatePredictor(state.currentValue); } 
                 else { const tickHistory = tickHistoriesRef.current[tabIndex]; tickHistory.push(state.currentValue); if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); }
             };

@@ -427,18 +427,34 @@ useEffect(() => {
                         })}
 
                         {activeTradesUI.map(trade => {
-                            const tradeIcon = trade.type === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                            return (
-                            <div key={trade.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
-                                <img src={tradeIcon} className="w-5 h-5 opacity-80" />
-                                <div className="flex flex-col justify-center items-start gap-1">
-                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">OPERACIÓN EN CURSO</div>
-                                    <div className="text-sm font-medium uppercase">{trade.type === 'BUY' ? 'COMPRANDO...' : 'VENDIENDO...'}</div>
+                        // Definir colores según tipo de operación
+                        const isBuy = trade.type === 'BUY';
+                        const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
+                        const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
+                        const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown; // Usamos iconos específicos en lugar del genérico activityWin/Loss
+
+                        return (
+                            <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[40px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
+                                {/* Contenedor del Icono con Color y Sombra */}
+                                <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
+                                    <img src={icon} className="w-5 h-5 brightness-0 invert" /> {/* Invertir color para que el icono sea blanco sobre fondo de color */}
                                 </div>
-                                <div className="text-sm font-medium ml-2">{(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s</div>
+
+                                {/* Textos */}
+                                <div className="flex flex-col justify-center items-start gap-1.5">
+                                    <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">OPERACIÓN ABIERTA</div>
+                                    <div className="text-white text-sm font-medium font-sans leading-none uppercase">
+                                        {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
+                                    </div>
+                                </div>
+
+                                {/* Temporizador */}
+                                <div className="text-white text-sm font-medium font-sans leading-none">
+                                    {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                </div>
                             </div>
-                            );
-                        })}
+                        );
+                    })}
                     </div>
 
                     <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">

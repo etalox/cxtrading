@@ -784,7 +784,7 @@
 
                             if(note.type === 'SIGNAL') {
                                 iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleX(-1)' : 'none' };
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
                             }
 
                             return (
@@ -812,7 +812,7 @@
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
                             const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
                             const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                            const iconStyle = isBuy ? {} : { transform: 'scaleX(-1)' };
+                            const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
@@ -911,7 +911,7 @@
                                     disabled={tradesDisabled}
                                     className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleX(-1)' }} />
+                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
                                     <div className="flex flex-col items-start gap-0 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
                                         <div className="text-sm font-medium">SELL / {currentDuration}s.</div>

@@ -455,7 +455,7 @@
                 kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
                 marketStatesRef.current[tabIndex] = { ...createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
                 
-                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15; 
+                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 5; 
                 warmUpMarket(tabIndex, randomWarmupMinutes);
                 setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
                 if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }
@@ -479,8 +479,7 @@
             };
             
             const handleGenerateAsset = () => { 
-                // Añadimos !isOnline para evitar que funcione sin internet
-                if (isGenerating || !isOnline) return; 
+                if (isGenerating) return; 
                 setIsGenerating(true); 
                 setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
@@ -555,14 +554,11 @@
                 };
 
                 const drawLoop = () => {
-                    animationId = requestAnimationFrame(drawLoop);
 
+                    // Si no hay internet o la pestaña no es visible, NO actualizamos la vista
                     if (!navigator.onLine || document.hidden) {
-                        return;
-                    }
-
-                    const now = Date.now();
-                    const state = marketStatesRef.current[activeTab];
+                    return;
+    }
                     
                     animationId = requestAnimationFrame(drawLoop);
                     

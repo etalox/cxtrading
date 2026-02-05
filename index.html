@@ -29,7 +29,20 @@
         .zoom-slider { -webkit-appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
     </style>
-</head>
+                if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; } 
+                const range = maxPrice - minPrice || 10; 
+                const padding = range * 0.45; 
+                let yMax = maxPrice + padding, yMin = minPrice - padding; 
+                if (isMobileRef.current) { 
+                    const r = yMax - yMin || 10; 
+                    const tempGetY = (price) => height - ((price - yMin) / r) * height; 
+                    const curY = tempGetY(state.visualValue); 
+                    const shiftPx = (height / 2) - curY; 
+                    const pricePerPx = r / height; 
+                    const priceShift = shiftPx * pricePerPx; 
+                    yMin -= priceShift; 
+                    yMax -= priceShift; 
+                } 
 <body>
     <div id="root"></div>
 
@@ -50,6 +63,69 @@
         const MarketSim = () => {
             const isMobile = window.innerWidth < 768;
             const INITIAL_ZOOM = isMobile ? 160 : 320;
+            const isMobileRef = useRef(isMobile);
+            
+                // Actualizar isMobileRef en resize y añadir handlers de wheel/pinch
+                useEffect(() => {
+                    const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
+                    updateMobile();
+                    window.addEventListener('resize', updateMobile);
+                    const container = containerRef.current;
+                    if (!container) return () => window.removeEventListener('resize', updateMobile);
+
+                    const isInteractive = (node) => {
+                        try { return node && node.closest && node.closest('button, input, .glass-button'); } catch (e) { return false; }
+                    };
+
+                    const onWheel = (e) => {
+                        if (isInteractive(e.target)) return;
+                        e.preventDefault();
+                        const delta = -e.deltaY;
+                        const factor = delta > 0 ? 1.06 : 0.94;
+                        setZoom(z => Math.max(80, Math.min(350, Math.round(z * factor))));
+                    };
+
+                    let touchActive = false;
+                    const onTouchStart = (e) => {
+                        if (e.touches && e.touches.length === 2) {
+                            if (isInteractive(e.target)) return;
+                            touchActive = true;
+                            const dx = e.touches[0].clientX - e.touches[1].clientX;
+                            const dy = e.touches[0].clientY - e.touches[1].clientY;
+                            pinchStartRef.current = Math.hypot(dx, dy);
+                            lastTouchTargetRef.current = e.target;
+                        }
+                    };
+
+                    const onTouchMove = (e) => {
+                        if (!touchActive) return;
+                        if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
+                            if (isInteractive(lastTouchTargetRef.current)) return;
+                            e.preventDefault();
+                            const dx = e.touches[0].clientX - e.touches[1].clientX;
+                            const dy = e.touches[0].clientY - e.touches[1].clientY;
+                            const dist = Math.hypot(dx, dy);
+                            const ratio = dist / (pinchStartRef.current || dist);
+                            pinchStartRef.current = dist;
+                            setZoom(z => Math.max(80, Math.min(350, Math.round(z * ratio))));
+                        }
+                    };
+
+                    const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
+
+                    container.addEventListener('wheel', onWheel, { passive: false });
+                    container.addEventListener('touchstart', onTouchStart, { passive: false });
+                    container.addEventListener('touchmove', onTouchMove, { passive: false });
+                    container.addEventListener('touchend', onTouchEnd);
+
+                    return () => {
+                        window.removeEventListener('resize', updateMobile);
+                        container.removeEventListener('wheel', onWheel);
+                        container.removeEventListener('touchstart', onTouchStart);
+                        container.removeEventListener('touchmove', onTouchMove);
+                        container.removeEventListener('touchend', onTouchEnd);
+                    };
+                }, []);
 
             const materials = ["AX", "BR", "ORE", "CX", "PLATA", "F", "G", "X", "Y", "RB"];
             const adjectives = ["45", "19", "91", "10", "11", "05", "PRO", "16", "55"];
@@ -66,7 +142,7 @@
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
             
-            const canvasRef = useRef(null); const containerRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
+            const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
             const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
             
             const sigmoid = (x) => 1 / (1 + Math.exp(-x));

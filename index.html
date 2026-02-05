@@ -29,7 +29,6 @@
         .tab-item { transition: all 0.2s ease; cursor: pointer; }
         .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
-        /* Toggle Switch */
         .toggle-switch { position: relative; width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; transition: background 0.3s; }
         .toggle-switch.active { background: #10B981; }
         .toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.3s; }
@@ -57,6 +56,7 @@
         };
 
         const MATERIALS = ["PLATA", "BRONCE", "HIERRO", "COBRE", "LITIO", "ORO", "RODIO", "IRIDIO", "PLASMA", "AX-99"];
+        // Adjetivos ordenados para índices:
         const ADJECTIVES = ["01", "02", "05", "10", "15", "RAW", "20", "25", "30", "45", "STD", "50", "80", "90", "PRO", "PRIME", "MAX"];
 
         const MarketSim = () => {
@@ -71,6 +71,18 @@
                 { name: "INIT 03", price: 1000, change: 0 }
             ]);
             
+            // 1. PERSISTENCIA DE BALANCE
+            const [balance, setBalance] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('cx_balance');
+                    return saved ? parseFloat(saved) : 100000;
+                } catch (e) { return 100000; }
+            });
+            useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
+
+            // HISTORIAL DE ACTIVOS VISTOS { name: string, timestamp: number }
+            const assetHistoryRef = useRef([]);
+
             const createEmptyState = () => ({
                 visualTicks: [], candles: [], longTermTicks: [], currentValue: 1000, visualValue: 1000, 
                 lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, 
@@ -78,7 +90,8 @@
                 currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
                 ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
                 currentAnchor: 0.75, tradeDuration: 10000,
-                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0 },
+                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false }, // Nuevo flag
+                stepBuffer: 0, // Para movimiento escalonado
                 initialized: false
             });
 
@@ -96,11 +109,7 @@
                 window.addEventListener('resize', updateMobile);
                 const container = containerRef.current;
                 if (!container) return () => window.removeEventListener('resize', updateMobile);
-
-                const isInteractive = (node) => {
-                    try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; }
-                };
-
+                const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
                 const onWheel = (e) => {
                     if (isInteractive(e.target)) return;
                     e.preventDefault();
@@ -108,50 +117,26 @@
                     const factor = delta > 0 ? 1.06 : 0.94;
                     setZoom(z => Math.max(80, Math.min(350, Math.round(z * factor))));
                 };
-
                 let touchActive = false;
                 const onTouchStart = (e) => {
-                    if (e.touches && e.touches.length === 2) {
-                        if (isInteractive(e.target)) return;
-                        touchActive = true;
-                        const dx = e.touches[0].clientX - e.touches[1].clientX;
-                        const dy = e.touches[0].clientY - e.touches[1].clientY;
-                        pinchStartRef.current = Math.hypot(dx, dy);
-                        lastTouchTargetRef.current = e.target;
-                    }
+                    if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
                 };
                 const onTouchMove = (e) => {
                     if (!touchActive) return;
-                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
-                        if (isInteractive(lastTouchTargetRef.current)) return;
-                        e.preventDefault();
-                        const dx = e.touches[0].clientX - e.touches[1].clientX;
-                        const dy = e.touches[0].clientY - e.touches[1].clientY;
-                        const dist = Math.hypot(dx, dy);
-                        const ratio = (pinchStartRef.current || dist) / dist;
-                        pinchStartRef.current = dist;
-                        setZoom(z => Math.max(80, Math.min(350, Math.round(z * ratio))));
-                    }
+                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) { if (isInteractive(lastTouchTargetRef.current)) return; e.preventDefault(); const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const dist = Math.hypot(dx, dy); const ratio = (pinchStartRef.current || dist) / dist; pinchStartRef.current = dist; setZoom(z => Math.max(80, Math.min(350, Math.round(z * ratio)))); }
                 };
                 const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
                 container.addEventListener('wheel', onWheel, { passive: false });
                 container.addEventListener('touchstart', onTouchStart, { passive: false });
                 container.addEventListener('touchmove', onTouchMove, { passive: false });
                 container.addEventListener('touchend', onTouchEnd);
-                return () => {
-                    window.removeEventListener('resize', updateMobile);
-                    container.removeEventListener('wheel', onWheel);
-                    container.removeEventListener('touchstart', onTouchStart);
-                    container.removeEventListener('touchmove', onTouchMove);
-                    container.removeEventListener('touchend', onTouchEnd);
-                };
+                return () => { window.removeEventListener('resize', updateMobile); container.removeEventListener('wheel', onWheel); container.removeEventListener('touchstart', onTouchStart); container.removeEventListener('touchmove', onTouchMove); container.removeEventListener('touchend', onTouchEnd); };
             }, []);
 
             const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
             const DURATIONS = [5000, 10000, 15000, 30000];
 
             const [zoom, setZoom] = useState(INITIAL_ZOOM); 
-            const [balance, setBalance] = useState(100000); 
             const [activeTradesUI, setActiveTradesUI] = useState([]); 
             const [notifications, setNotifications] = useState([]); 
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
@@ -160,10 +145,10 @@
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
-            const [autopilot, setAutopilot] = useState(false); // NUEVO: Piloto Automático
+            const [autopilot, setAutopilot] = useState(false); 
             
             const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
-            const lastSignalRef = useRef(null); // Para evitar duplicados en autopilot
+            const lastSignalRef = useRef(null); 
             
             const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
             const resultLabelsRef = useRef([]);
@@ -200,7 +185,13 @@
                 const seed = (materialIdx * 100) + adjectiveIdx;
                 const pseudoRand = Math.sin(seed) * 0.5 + 0.5; 
                 const trendBias = (pseudoRand - 0.5) * 0.3; 
-                return { volatility, aggression, structure, trendBias };
+                
+                // 4. DETECCIÓN DE ESCALONADO (Múltiplos de 10)
+                // Checamos si el index en ADJECTIVES es múltiplo de 3 (para simular el "10" de un conjunto grande)
+                // O si el nombre del adjetivo contiene "0" al final. Simplificación: Usamos modulo 3 del index.
+                const isStepped = (adjectiveIdx % 3 === 0);
+
+                return { volatility, aggression, structure, trendBias, isStepped };
             };
 
             const updatePredictor = (newPrice) => { 
@@ -239,12 +230,12 @@
                         addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
                         state.lastSignalTick = state.currentValue;
                         
-                        // AUTOPILOT: Ejecutar automáticamente si está activo y confianza >60%
-                        if (autopilot && confidence > 0.6 && activeTradesRef.current.length < 4) {
+                        // 2. AUTOPYLOT: SOLO 1 TRADE SIMULTÁNEO
+                        if (autopilot && confidence > 0.6 && activeTradesRef.current.length === 0) {
                             const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
-                            if (lastSignalRef.current !== currentSignal) { // Evitar duplicados
+                            if (lastSignalRef.current !== currentSignal) { 
                                 lastSignalRef.current = currentSignal;
-                                setTimeout(() => executeTrade(signalType), 100); // Pequeño delay para suavidad
+                                setTimeout(() => executeTrade(signalType), 100); 
                             }
                         }
                     } 
@@ -293,7 +284,24 @@
                 const r1 = Math.random(); const r2 = Math.random(); const noise = (r1 + r2) - 1.0; 
                 const baseVol = state.currentValue * 0.0006; 
                 const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
-                state.currentValue += movement; 
+                
+                // 4. LÓGICA DE MOVIMIENTO ESCALONADO (STEPPED)
+                if (dna.isStepped && state.patternState !== 'MOMENTUM') {
+                    // Acumulamos el movimiento en un buffer
+                    state.stepBuffer = (state.stepBuffer || 0) + movement;
+                    
+                    // Solo aplicamos el cambio cada 8 ticks (aprox 4 segundos)
+                    // Usamos ticksSincePatternChange como contador cíclico simple
+                    if (state.ticksSincePatternChange % 8 === 0) {
+                        state.currentValue += state.stepBuffer;
+                        state.stepBuffer = 0; // Reset buffer
+                    }
+                    // Si no toca cambio, el precio se mantiene plano (meseta)
+                } else {
+                    // Movimiento fluido normal
+                    state.currentValue += movement; 
+                }
+                
                 if (state.currentValue < 10) state.currentValue = 10; 
                 if (isWarmup) state.visualValue = state.currentValue; 
                 state.lastDirection = movement > 0 ? 1 : -1; 
@@ -322,31 +330,78 @@
             };
             
             const generateAssetForTab = useCallback((tabIndex) => {
+                const now = Date.now();
+                // Limpiar historial antiguo (> 5 mins)
+                assetHistoryRef.current = assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
+
+                let attempts = 0;
+                let selectedName = "";
+                let matIdx, adjIdx;
+                
+                // 7. BUCLE DE BÚSQUEDA HASTA ENCONTRAR DISPONIBLE
+                const findAvailableAsset = () => {
+                    while (attempts < 100) {
+                        attempts++;
+                        const mIdx = Math.floor(Math.random() * MATERIALS.length);
+                        const aIdxRaw = Math.floor(Math.pow(Math.random(), 1.5) * ADJECTIVES.length);
+                        const aIdx = Math.min(aIdxRaw, ADJECTIVES.length - 1);
+                        const fullName = `${MATERIALS[mIdx]} ${ADJECTIVES[aIdx]}`;
+                        
+                        // 5. NO REPETIR EN TABS ACTUALES
+                        const isCurrentlyActive = assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
+                        
+                        // 6. NO REPETIR HISTORIAL RECIENTE
+                        const inHistory = assetHistoryRef.current.some(a => a.name === fullName);
+
+                        if (!isCurrentlyActive && !inHistory) {
+                            selectedName = fullName;
+                            matIdx = mIdx;
+                            adjIdx = aIdx;
+                            // Agregar a historial
+                            assetHistoryRef.current.push({ name: fullName, timestamp: now });
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                if (!findAvailableAsset()) {
+                    // Si falla después de 100 intentos, reintentamos con un timeout (simulando espera)
+                    setTimeout(() => generateAssetForTab(tabIndex), 500);
+                    return; // Mantenemos estado de 'loading'
+                }
+
+                // SI ENCONTRAMOS ACTIVO, PROCEDEMOS
                 const rand = Math.pow(Math.random(), 2.5); 
                 const newBasePrice = 1000 + (1 - rand) * 99000; 
-                const matIdx = Math.floor(Math.random() * MATERIALS.length);
-                const adjIdxRaw = Math.floor(Math.pow(Math.random(), 1.5) * ADJECTIVES.length);
-                const adjIdx = Math.min(adjIdxRaw, ADJECTIVES.length - 1);
-                const material = MATERIALS[matIdx];
-                const adjective = ADJECTIVES[adjIdx];
-                const fullName = `${material} ${adjective}`;
                 const dna = generateDNAFromName(matIdx, adjIdx);
                 let preferredDurations;
                 if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; } 
                 else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; } 
                 else { preferredDurations = [5000, 10000, 15000, 30000]; }
                 const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
+                
                 tickHistoriesRef.current[tabIndex] = [];
                 kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
                 marketStatesRef.current[tabIndex] = { ...createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
                 warmUpMarket(tabIndex, 15);
-                setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: fullName, price: newBasePrice, change: 0 }; return next; });
+                setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
                 if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }
-            }, [activeTab]);
+                
+                // Finalizamos carga
+                setIsGenerating(false);
+
+            }, [activeTab, assetsInfo]); // Dependencia assetsInfo para chequear duplicados actuales
 
             useEffect(() => {
-                if (!marketStatesRef.current[0].initialized) { generateAssetForTab(0); generateAssetForTab(1); generateAssetForTab(2); }
-            }, [generateAssetForTab]);
+                if (!marketStatesRef.current[0].initialized) { 
+                    setIsGenerating(true);
+                    // Inicialización secuencial pequeña para evitar bloqueo
+                    setTimeout(() => generateAssetForTab(0), 10);
+                    setTimeout(() => generateAssetForTab(1), 50);
+                    setTimeout(() => generateAssetForTab(2), 100);
+                }
+            }, []);
 
             const handleTabChange = (index) => {
                 setActiveTab(index);
@@ -358,12 +413,15 @@
             const handleGenerateAsset = () => { 
                 if (isGenerating) return; 
                 setIsGenerating(true); 
-                setTimeout(() => { generateAssetForTab(activeTab); setIsGenerating(false); }, 600); 
+                // Delay artificial para UX
+                setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
-                if (activeTradesRef.current.length >= 4) return;
+                // 2. RESTRICCIÓN AUTOPYLOT: Si activo, max 1 trade global. Si no, max 4.
+                const maxTrades = autopilot ? 1 : 4;
+                if (activeTradesRef.current.length >= maxTrades) return;
                 
                 setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
                 isNotificationVisible.current = false; 
@@ -391,7 +449,6 @@
                 setBalance(prev => prev - INVESTMENT_AMOUNT); 
             };
 
-            // NUEVO: Click en Notificación
             const handleNotificationClick = (notification) => {
                 if (notification.type === 'SIGNAL') {
                     executeTrade(notification.signalType);
@@ -672,8 +729,8 @@
 
             const sliderPercentage = ((zoom - 80) / (350 - 80)) * 100;
 
-            // NUEVO: Calcular si los botones de trading deben estar deshabilitados
-            const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= 4;
+            const maxTrades = autopilot ? 1 : 4;
+            const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= maxTrades;
 
             return (
                 <div className="flex flex-col h-screen relative bg-[#050505] text-white font-sans overflow-hidden">
@@ -760,7 +817,6 @@
                         })}
 
                         {activeTradesUI.map(trade => {
-                            const isCurrentTab = trade.tabIndex === activeTab;
                             const tradeAsset = assetsInfo[trade.tabIndex].name;
                             const isBuy = trade.type === 'BUY';
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
@@ -803,6 +859,7 @@
                             
                             <button 
                                 onClick={handleGenerateAsset} 
+                                disabled={isGenerating}
                                 className={`glass-button w-full md:w-[280px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
                             >
                                 <div className="w-5 h-5 flex items-center justify-center">
@@ -821,14 +878,14 @@
                                 </div>
                             </button>
 
-                            {/* NUEVO: AUTOPILOT TOGGLE (Solo Desktop) */}
+                            {/* 3. AUTOPYLOT (Renombrado y actualizado) */}
                             {!isMobile && (
                                 <div className="glass-button h-16 px-6 flex items-center gap-4 order-2 cursor-pointer" onClick={() => setAutopilot(!autopilot)}>
                                     <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
                                         <div className="toggle-knob"></div>
                                     </div>
                                     <div className="flex flex-col items-start gap-1">
-                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">PILOTO AUTOMÁTICO</div>
+                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPYLOT</div>
                                         <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
                                     </div>
                                 </div>

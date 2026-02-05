@@ -999,11 +999,11 @@
                                 <div 
                                     key={note.id} 
                                     onClick={() => handleNotificationClick(note)}
-                                    className={`glass-panel !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/50 transition-all' : ''}`}
+                                    className={`glass-panel !bg-white/15 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                                 >
 
                                     <div className="w-12 h-12 border border-white/50 rounded-[15px] flex items-center justify-center shrink-0">
-                                        <img src={iconSrc} className={`${iconClass} animate-pulse`} style={iconStyle} />
+                                        <img src={iconSrc} className={`${iconClass} animate-pulse`}/>
                                     </div>
 
                                     <div className="flex flex-col justify-center items-start gap-1">

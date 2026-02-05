@@ -137,7 +137,7 @@
             
             const addNotification = useCallback((data) => { if (data.type === 'SIGNAL' && isNotificationVisible.current) return; const id = Date.now() + Math.random(); const duration = data.type === 'OFFLINE' ? 0 : 4000; setNotifications(prev => { if (data.type === 'WIN' || data.type === 'LOSS') return [{ ...data, id }]; if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; return prev; }); if (data.type !== 'OFFLINE') { isNotificationVisible.current = true; setTimeout(() => { setNotifications(prev => prev.filter(n => n.id !== id)); if (notifications.length <= 1) isNotificationVisible.current = false; }, duration); } else { isNotificationVisible.current = true; } }, []);
             
-            const marketState = useRef({ visualTicks: [], candles: [], longTermTicks: [], currentValue: 15868, visualValue: 15868, lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0 });
+            const marketState = useRef({ visualTicks: [], candles: [], longTermTicks: [], currentValue: 15868, visualValue: 15868, lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0});
             const tickHistory = useRef([]); const kinematicState = useRef({ lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 });
             
             useEffect(() => { const handleOnline = () => { setIsOnline(true); setNotifications([]); isNotificationVisible.current = false; }; const handleOffline = () => { setIsOnline(false); offlineStartRef.current = Date.now(); }; window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline); return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); }; }, []);
@@ -222,10 +222,46 @@
                         let minPrice = Infinity, maxPrice = -Infinity;
                         allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
                         if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
-                        const range = maxPrice - minPrice || 10;
-                        const padding = range * 0.45;
-                        const yMax = maxPrice + padding, yMin = minPrice - padding;
-                        const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+                        // ... código anterior (bucle forEach para minPrice/maxPrice) ...
+
+// === INICIO DE LÓGICA DE AJUSTE VERTICAL ===
+const range = maxPrice - minPrice || 10;
+const padding = range * 0.45;
+
+// 1. Definimos los límites "ideales" originales
+let targetYMax = maxPrice + padding;
+let targetYMin = minPrice - padding;
+
+// 2. Calculamos dónde caería el precio actual en píxeles sin ajuste
+const pixelHeight = height;
+const priceRange = targetYMax - targetYMin;
+const pixelsPerPrice = pixelHeight / priceRange;
+const rawY = pixelHeight - ((state.visualValue - targetYMin) / (targetYMax - targetYMin)) * pixelHeight;
+
+// 3. Zona de seguridad: Si el precio baja de aquí, empujamos el gráfico hacia arriba
+// Reservamos 180px (o el 25% de la pantalla si es muy pequeña) para la UI inferior
+const safeZoneBottom = Math.min(height - 180, height * 0.75);
+
+let neededShift = 0;
+if (rawY > safeZoneBottom) {
+    // Calculamos cuánto "precio" necesitamos desplazar para que el gráfico suba
+    const pixelsOff = rawY - safeZoneBottom;
+    neededShift = pixelsOff / pixelsPerPrice;
+}
+
+// 4. Suavizado (Lerp): Interpolamos el shift actual hacia el necesario
+// El factor 0.1 da ese movimiento "fluido" en lugar de un salto brusco
+state.verticalShift += (neededShift - state.verticalShift) * 0.1;
+
+// 5. Aplicamos el desplazamiento a los límites finales
+// Restar al Max y Min hace que la ventana de precios baje, por lo que el gráfico sube visualmente
+const yMax = targetYMax - state.verticalShift;
+const yMin = targetYMin - state.verticalShift;
+// === FIN DE LÓGICA DE AJUSTE VERTICAL ===
+
+const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+// ... resto del código ...
+
                         const currentY = getY(state.visualValue);
                         ctx.strokeStyle = '#222';
                         ctx.setLineDash([4, 4]);
@@ -420,13 +456,21 @@ useEffect(() => {
                         <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                             
                             {/* 1. EXPLORAR (Arriba Mobile / Izquierda Desktop) */}
-                            <button onClick={handleGenerateAsset} className="glass-button w-full md:w-56 h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1">
+                            <button 
+                                onClick={handleGenerateAsset} 
+                                className={`glass-button w-full md:w-56 h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                            >
                                 <div className="w-5 h-5 flex items-center justify-center">
-                                    <img src={isGenerating ? ICONS.loader : ICONS.search} className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} />
+                                    <img 
+                                        src={isGenerating ? ICONS.loader : ICONS.search} 
+                                        className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} 
+                                    />
                                 </div>
                                 <div className="flex flex-col items-start gap-1">
                                     <div className="opacity-60 text-white text-[10px] font-normal">NUEVO ACTIVO</div>
-                                    <div className="text-white text-sm font-normal">EXPLORAR ACTIVOS</div>
+                                    <div className="text-white text-sm font-normal">
+                                        {isGenerating ? 'BUSCANDO...' : 'EXPLORAR ACTIVOS'}
+                                    </div>
                                 </div>
                             </button>
 

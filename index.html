@@ -202,11 +202,11 @@
                     const canvas = canvasRef.current;
                     if (canvas) {
                         const dpr = window.devicePixelRatio || 1;
+                        const width = canvas.width / dpr;
+                        const height = canvas.height / dpr;
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         const state = marketState.current;
-                        const width = containerRef.current.clientWidth;
-                        const height = containerRef.current.clientHeight;
                         const priceSmoothing = 0.3;
                         state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing;
                         const horizontalSmoothing = 0.2;
@@ -299,20 +299,43 @@
                 };
             }, [zoom, addNotification]);
 
-            useEffect(() => {
-                const handleResize = () => {
-                    if (containerRef.current && canvasRef.current) {
-                        const dpr = window.devicePixelRatio || 1;
-                        canvasRef.current.width = containerRef.current.clientWidth * dpr;
-                        canvasRef.current.height = containerRef.current.clientHeight * dpr;
-                        canvasRef.current.style.width = containerRef.current.clientWidth + 'px';
-                        canvasRef.current.style.height = containerRef.current.clientHeight + 'px';
-                    }
-                };
-                window.addEventListener('resize', handleResize);
-                handleResize();
-                return () => window.removeEventListener('resize', handleResize);
-            }, []);
+
+// Reemplaza el useEffect de 'resize' con esto:
+useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        
+        // Obtener dimensiones precisas
+        const { width, height } = entry.contentRect;
+        
+        // Evitar errores si el tamaño es 0
+        if (width === 0 || height === 0) return;
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Configurar tamaño físico (high DPI)
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            
+            // Configurar tamaño lógico CSS
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            
+            // Forzar un redibujado inmediato si es necesario (opcional, el loop lo hará)
+            isMobileRef.current = width < 768;
+        }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+    }, []); 
+
             
             const sliderPercentage = ((zoom - 80) / (350 - 80)) * 100;
 

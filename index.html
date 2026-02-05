@@ -512,20 +512,28 @@
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         
-                        const priceSmoothing = 0.3;
-                        state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing;
-                        const horizontalSmoothing = 0.2;
-                        state.scrollOffset += (state.targetScroll - state.scrollOffset) * horizontalSmoothing;
+                                                // --- FÍSICA UNIFICADA (Evita jitter/saltos) ---
+                        const SMOOTHING = 0.1; 
+                        
+                        // 1. Suavizado de Precio
+                        state.visualValue += (state.currentValue - state.visualValue) * 0.3; // Precio puede ser más rápido
+                        
+                        // 2. Suavizado de Scroll Horizontal (Sincronizado con Zoom)
+                        state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
+                        
                         ctx.fillStyle = '#050505';
                         ctx.fillRect(0, 0, width, height);
+                        
                         const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
                         let allCandles = [...state.candles];
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
-                                                // Interpolation logic
-                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * 0.1;
-                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.1) zoomCurrentRef.current = zoomTargetRef.current;
+                        
+                        // 3. Suavizado de Zoom (Sincronizado)
+                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * SMOOTHING;
+                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.05) zoomCurrentRef.current = zoomTargetRef.current;
                         const candleWidth = width / zoomCurrentRef.current;
                         
+                        // 4. Lógica de Anchor (Posición del gráfico)
                         let targetAnchorPercent = 0.75;
                         const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); 
                         if (activeTrades.length > 0) {
@@ -533,6 +541,7 @@
                             if (maxDuration >= 30000) targetAnchorPercent = 0.50;
                             else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
                         }
+
                         if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
                         state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * 0.05;
                         const anchorX = width * state.currentAnchor;

@@ -217,49 +217,50 @@
                         let allCandles = [...state.candles];
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
                         const candleWidth = width / zoom;
-                        const anchorX = width * 0.82;
+                        const anchorX = width * 0.75;
                         const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
                         let minPrice = Infinity, maxPrice = -Infinity;
                         allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
                         if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+                        // ... código anterior (bucle forEach para minPrice/maxPrice) ...
 
-                        // === INICIO DE LÓGICA DE AJUSTE VERTICAL ===
-                        const range = maxPrice - minPrice || 10;
-                        const padding = range * 0.45;
+// === INICIO DE LÓGICA DE AJUSTE VERTICAL ===
+const range = maxPrice - minPrice || 10;
+const padding = range * 0.45;
 
-                        // 1. Definimos los límites "ideales" originales
-                        let targetYMax = maxPrice + padding;
-                        let targetYMin = minPrice - padding;
+// 1. Definimos los límites "ideales" originales
+let targetYMax = maxPrice + padding;
+let targetYMin = minPrice - padding;
 
-                        // 2. Calculamos dónde caería el precio actual en píxeles sin ajuste
-                        const pixelHeight = height;
-                        const priceRange = targetYMax - targetYMin;
-                        const pixelsPerPrice = pixelHeight / priceRange;
-                        const rawY = pixelHeight - ((state.visualValue - targetYMin) / (targetYMax - targetYMin)) * pixelHeight;
+// 2. Calculamos dónde caería el precio actual en píxeles sin ajuste
+const pixelHeight = height;
+const priceRange = targetYMax - targetYMin;
+const pixelsPerPrice = pixelHeight / priceRange;
+const rawY = pixelHeight - ((state.visualValue - targetYMin) / (targetYMax - targetYMin)) * pixelHeight;
 
-                        // 3. Zona de seguridad: Si el precio baja de aquí, empujamos el gráfico hacia arriba
-                        // Reservamos 180px (o el 25% de la pantalla si es muy pequeña) para la UI inferior
-                        const safeZoneBottom = Math.min(height - 180, height * 0.75);
+// 3. Zona de seguridad: Si el precio baja de aquí, empujamos el gráfico hacia arriba
+// Reservamos 180px (o el 25% de la pantalla si es muy pequeña) para la UI inferior
+const safeZoneBottom = Math.min(height - 180, height * 0.75);
 
-                        let neededShift = 0;
-                        if (rawY > safeZoneBottom) {
-                            // Calculamos cuánto "precio" necesitamos desplazar para que el gráfico suba
-                            const pixelsOff = rawY - safeZoneBottom;
-                            neededShift = pixelsOff / pixelsPerPrice;
-                        }
+let neededShift = 0;
+if (rawY > safeZoneBottom) {
+    // Calculamos cuánto "precio" necesitamos desplazar para que el gráfico suba
+    const pixelsOff = rawY - safeZoneBottom;
+    neededShift = pixelsOff / pixelsPerPrice;
+}
 
-                        // 4. Suavizado (Lerp): Interpolamos el shift actual hacia el necesario
-                        // El factor 0.1 da ese movimiento "fluido" en lugar de un salto brusco
-                        state.verticalShift += (neededShift - state.verticalShift) * 0.1;
+// 4. Suavizado (Lerp): Interpolamos el shift actual hacia el necesario
+// El factor 0.1 da ese movimiento "fluido" en lugar de un salto brusco
+state.verticalShift += (neededShift - state.verticalShift) * 0.1;
 
-                        // 5. Aplicamos el desplazamiento a los límites finales
-                        // Restar al Max y Min hace que la ventana de precios baje, por lo que el gráfico sube visualmente
-                        const yMax = targetYMax - state.verticalShift;
-                        const yMin = targetYMin - state.verticalShift;
-                        // === FIN DE LÓGICA DE AJUSTE VERTICAL ===
+// 5. Aplicamos el desplazamiento a los límites finales
+// Restar al Max y Min hace que la ventana de precios baje, por lo que el gráfico sube visualmente
+const yMax = targetYMax - state.verticalShift;
+const yMin = targetYMin - state.verticalShift;
+// === FIN DE LÓGICA DE AJUSTE VERTICAL ===
 
-                        const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
-                        // ... resto del código ...
+const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+// ... resto del código ...
 
                         const currentY = getY(state.visualValue);
                         ctx.strokeStyle = '#222';
@@ -323,21 +324,6 @@
                         ctx.font = 'bold 12px monospace';
                         ctx.textAlign = 'center';
                         ctx.fillText(state.visualValue.toFixed(2), width - 50, currentY + 5);
-
-                        const isSmallScreen = width < 768; // Detectar móvil basado en el ancho lógico
-                        const labelX = isSmallScreen ? 0 : width - 100; // Izquierda en móvil, Derecha en desktop
-                        const textX = isSmallScreen ? 50 : width - 50;  // Centro de la caja
-
-                        ctx.fillStyle = '#111';
-                        // Dibujar fondo de la etiqueta
-                        ctx.fillRect(labelX, currentY - 10, 100, 20);
-
-                        ctx.fillStyle = '#fff';
-                        ctx.font = 'bold 12px monospace';
-                        ctx.textAlign = 'center';
-                        // Dibujar texto
-                        ctx.fillText(state.visualValue.toFixed(2), textX, currentY + 5);
-                        // === FIN DE LÓGICA DE ETIQUETA DE PRECIO ===
                     }
                     animationId = requestAnimationFrame(drawLoop);
                 };

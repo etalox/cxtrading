@@ -733,25 +733,25 @@
                         )}
 
                         {notifications.map(note => {
-                        let iconSrc = ICONS.activityNeutral;
-                        if (note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-
-                        return (
-                            <div
-                            key={note.id}
-                            onClick={() => handleNotificationClick(note)}
-                            className={`glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 ${
-                                note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''
-                            }`}
-                            >
-                            {/* AQUÍ: hacerlo negro */}
-                            <img src={iconSrc} className="w-5 h-5 brightness-0" />
-
-                            <div className="flex flex-col justify-center items-start gap-1">
-                                ...
-                            </div>
-                            </div>
-                        );
+                            let iconSrc = ICONS.activityNeutral;
+                            if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                            return (
+                                <div 
+                                    key={note.id} 
+                                    onClick={() => handleNotificationClick(note)}
+                                    className={`glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''}`}
+                                >
+                                    <img src={iconSrc} className="w-5 h-5" />
+                                    <div className="flex flex-col justify-center items-start gap-1">
+                                        <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
+                                            {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'NOTIFICACIÓN'}
+                                        </div>
+                                        <div className="text-sm font-medium">
+                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
                         })}
 
                         {activeTradesUI.map(trade => {
@@ -764,7 +764,7 @@
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
                                     <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0 invert" />
+                                        <img src={icon} className="w-5 h-5 brightness-0" />
                                     </div>
                                     <div className="flex flex-col justify-center items-start gap-1.5">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">

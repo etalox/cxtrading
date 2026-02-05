@@ -508,6 +508,28 @@
             const handleNotificationClick = (notification) => {
                 if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
             };
+
+                        // --- GESTIÓN DE CONEXIÓN A INTERNET ---
+            useEffect(() => {
+                const handleOnline = () => {
+                    setIsOnline(true);
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE')); // Quitar aviso de offline
+                };
+                
+                const handleOffline = () => {
+                    setIsOnline(false);
+                    // Mostrar notificación persistente
+                    addNotification({ type: 'OFFLINE' });
+                };
+
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, [addNotification]);
             
             useEffect(() => {
                 let animationId;

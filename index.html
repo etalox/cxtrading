@@ -1024,20 +1024,29 @@
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
+                                                                    {/* Icono */}
+                                <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
+                                    <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
+                                </div>
+                                
+                                {/* Contenedor de Textos (Ocupa el resto del espacio) */}
+                                <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
+                                    {/* Etiqueta superior */}
+                                    <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
+                                        {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
                                     </div>
-                                    <div className="flex flex-col justify-center items-start gap-1.5">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                            {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
-                                        </div>
+                                    
+                                    {/* Fila Inferior: Estado + Contador alineados */}
+                                    <div className="flex items-baseline justify-between w-full">
                                         <div className="text-white text-sm font-medium font-sans leading-none uppercase">
                                             {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
                                         </div>
+                                        {/* Contador movido aquí dentro */}
+                                        <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
+                                            {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                        </div>
                                     </div>
-                                    <div className="text-white text-sm font-medium font-sans leading-none">
-                                        {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
-                                    </div>
+                                </div>
                                 </div>
                             );
                         })}

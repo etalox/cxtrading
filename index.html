@@ -105,27 +105,6 @@
             ]);
 
             useEffect(() => {
-        const hasActiveTrades = activeTradesUI.length > 0;
-
-        if (hasActiveTrades) {
-            if (zoomTargetRef.current > 200) {
-                preTradeZoomRef.current = zoomTargetRef.current; 
-                isUserInteractingRef.current = false; 
-                
-                zoomTargetRef.current = 160;
-                setZoom(160); 
-            }
-        } else {
-            if (preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
-                zoomTargetRef.current = preTradeZoomRef.current;
-                setZoom(preTradeZoomRef.current); 
-                preTradeZoomRef.current = null;
-            }
-        }
-    }, [activeTradesUI.length]); // Se ejecuta cuando cambia la cantidad de trades
-    // ---------------------------------------------------------
-
-            useEffect(() => {
                 const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
                 updateMobile();
                 window.addEventListener('resize', updateMobile);
@@ -133,47 +112,36 @@
                 if (!container) return () => window.removeEventListener('resize', updateMobile);
                 const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
                 const onWheel = (e) => {
-                // Si el usuario hace zoom, marcamos interacción manual para no forzar el auto-zoom
-                if (isInteractive(e.target)) return;
-                
-                e.preventDefault();
-                isUserInteractingRef.current = true; // El usuario tomó el control
-
-                const delta = -e.deltaY;
-                const factor = delta > 0 ? 0.94 : 1.06;
-                
-                // Calculamos el nuevo objetivo
-                const newTarget = Math.max(80, Math.min(500, zoomTargetRef.current * factor));
-                
-                // Actualizamos referencia para animación y estado para UI
-                zoomTargetRef.current = newTarget;
-                setZoom(newTarget);
-              };
+        if (isInteractive(e.target)) return;
+        e.preventDefault();
+        isUserInteractingRef.current = true;
+        const delta = -e.deltaY;
+        const factor = delta > 0 ? 0.94 : 1.06;
+        const newTarget = Math.max(80, Math.min(500, zoomTargetRef.current * factor));
+        zoomTargetRef.current = newTarget;
+        setZoom(newTarget);
+    };
                 let touchActive = false;
                 const onTouchStart = (e) => {
                     if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
                 };
                 const onTouchMove = (e) => {
-                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
-                    if (isInteractive(lastTouchTargetRef.current)) return;
-                    
-                    e.preventDefault();
-                    
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const dist = Math.hypot(dx, dy);
-
-                    const ratio = (pinchStartRef.current || dist) / dist;
-                    
-                    pinchStartRef.current = dist;
-                    
-                    isUserInteractingRef.current = true;
-                    const newTarget = Math.max(80, Math.min(500, Math.round(zoomTargetRef.current * ratio)));
-                    
-                    zoomTargetRef.current = newTarget;
-                    setZoom(newTarget);
-                }
-                };
+        if (!touchActive) return;
+        if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
+            if (isInteractive(lastTouchTargetRef.current)) return;
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            const ratio = (pinchStartRef.current || dist) / dist;
+            pinchStartRef.current = dist;
+            
+            isUserInteractingRef.current = true;
+            const newTarget = Math.max(80, Math.min(500, Math.round(zoomTargetRef.current * ratio)));
+            zoomTargetRef.current = newTarget;
+            setZoom(newTarget);
+        }
+    };
                 const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
                 container.addEventListener('wheel', onWheel, { passive: false });
                 container.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -185,10 +153,13 @@
             const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
             const DURATIONS = [5000, 10000, 15000, 30000];
 
-            const zoomTargetRef = useRef(INITIAL_ZOOM);   // El objetivo al que queremos llegar
-            const zoomCurrentRef = useRef(INITIAL_ZOOM);  // El valor actual real dibujado en canvas
-            const preTradeZoomRef = useRef(null);         // Memoria del zoom antes de entrar en operación
-            const isUserInteractingRef = useRef(false);   // Flag para detectar intervención manual 
+                const [zoom, setZoom] = useState(INITIAL_ZOOM);
+    // --- ZOOM SYSTEM REFS ---
+    const zoomTargetRef = useRef(INITIAL_ZOOM);
+    const zoomCurrentRef = useRef(INITIAL_ZOOM);
+    const preTradeZoomRef = useRef(null);
+    const isUserInteractingRef = useRef(false);
+ 
             const [activeTradesUI, setActiveTradesUI] = useState([]); 
             const [notifications, setNotifications] = useState([]); 
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
@@ -197,7 +168,27 @@
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
-            const [autopilot, setAutopilot] = useState(false); 
+            const [autopilot, setAutopilot] = useState(false);
+
+    // --- AUTO-ZOOM EFFECT ---
+    useEffect(() => {
+        const hasActiveTrades = activeTradesUI.length > 0;
+        if (hasActiveTrades) {
+            if (zoomTargetRef.current > 200) {
+                preTradeZoomRef.current = zoomTargetRef.current;
+                isUserInteractingRef.current = false;
+                zoomTargetRef.current = 160;
+                setZoom(160);
+            }
+        } else {
+            if (preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
+                zoomTargetRef.current = preTradeZoomRef.current;
+                setZoom(preTradeZoomRef.current);
+                preTradeZoomRef.current = null;
+            }
+        }
+    }, [activeTradesUI.length]);
+ 
             
             const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
             const lastSignalRef = useRef(null); 
@@ -530,7 +521,10 @@
                         const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
                         let allCandles = [...state.candles];
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
-                        const candleWidth = width / zoom;
+                                                // Interpolation logic
+                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * 0.1;
+                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.1) zoomCurrentRef.current = zoomTargetRef.current;
+                        const candleWidth = width / zoomCurrentRef.current;
                         
                         let targetAnchorPercent = 0.75;
                         const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); 
@@ -542,16 +536,6 @@
                         if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
                         state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * 0.05;
                         const anchorX = width * state.currentAnchor;
-
-                        // Ajusta 0.1 para más velocidad (0.2) o más suavidad (0.05)
-                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * 0.5;
-
-                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.1) {
-                            zoomCurrentRef.current = zoomTargetRef.current;
-                        }
-
-                        // 2. USAR EL VALOR INTERPOLADO
-                        const candleWidth = width / zoomCurrentRef.current;
 
                         const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
                         let minPrice = Infinity, maxPrice = -Infinity;
@@ -782,7 +766,7 @@
                         </div>
                     </div>
 
-                    <div className="absolute top-[100px] md:top-[140px] w-full flex flex-col items-center gap-4 z-30 pointer-events-none px-4">
+                    <div className="absolute top-[120px] md:top-[105px] w-full flex flex-col items-center gap-4 z-30 pointer-events-none px-4">
                         {!isOnline && (
                             <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
                                 <img src={ICONS.wifiOff} className="w-5 h-5 opacity-80" />
@@ -800,7 +784,7 @@
 
                             if(note.type === 'SIGNAL') {
                                 iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleX(-1)' : 'none' };
                             }
 
                             return (
@@ -828,11 +812,11 @@
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
                             const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
                             const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                            const iconStyle = isBuy ? {} : { transform: 'scaleYgit (-1)' };
+                            const iconStyle = isBuy ? {} : { transform: 'scaleX(-1)' };
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[20px] flex items-center justify-center`}>
+                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
                                         <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
                                     </div>
                                     <div className="flex flex-col justify-center items-start gap-1.5">
@@ -879,8 +863,8 @@
                                     <div className="opacity-60 text-white text-[10px] font-normal uppercase">
                                         {isMobile ? 'EXPLORACIÓN' : 'EXPLORAR'}
                                     </div>
-                                    <div className="text-white text-sm font-normal whitespace-nowrap">
-                                        {isGenerating ? 'BUSCANDO...' : 'Nuevo Activo'}
+                                    <div className="text-white text-sm font-normal uppercase whitespace-nowrap">
+                                        {isGenerating ? 'BUSCANDO...' : 'NUEVO ACTIVO'}
                                     </div>
                                 </div>
                             </button>
@@ -895,7 +879,7 @@
                                     </div>
                                     <div className="flex flex-col items-start gap-1">
                                         <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
-                                        <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ON' : 'OFF'}</div>
+                                        <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
                                     </div>
                                 </div>
                             )}
@@ -906,7 +890,7 @@
                                     className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                                     style={{ left: `${sliderPercentage}%` }} 
                                 ></div>
-                                <input type="range" min="80" max="500" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="zoom-slider" />
+                                <input type="range" min="80" max="500" value={zoom} onChange={(e) => { const val = Number(e.target.value); isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }} className="zoom-slider" />
                             </div>
 
                             <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
@@ -927,7 +911,7 @@
                                     disabled={tradesDisabled}
                                     className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
+                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleX(-1)' }} />
                                     <div className="flex flex-col items-start gap-0 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
                                         <div className="text-sm font-medium">SELL / {currentDuration}s.</div>

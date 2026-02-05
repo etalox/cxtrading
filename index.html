@@ -191,6 +191,7 @@
                             let iconSrc = ICONS.activityNeutral;
                             if(note.type === 'WIN') iconSrc = ICONS.activityWin;
                             if(note.type === 'LOSS') iconSrc = ICONS.activityLoss;
+                            if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
                             return (
                                 <div key={note.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
                                     <img src={iconSrc} className="w-5 h-5" />
@@ -206,16 +207,19 @@
                             );
                         })}
 
-                        {activeTradesUI.map(trade => (
+                        {activeTradesUI.map(trade => {
+                            const tradeIcon = trade.type === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                            return (
                             <div key={trade.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
-                                <img src={ICONS.activityNeutral} className="w-5 h-5 opacity-80" />
+                                <img src={tradeIcon} className="w-5 h-5 opacity-80" />
                                 <div className="flex flex-col justify-center items-start gap-1">
                                     <div className="opacity-80 text-white/50 text-[10px] font-normal">OPERACIÓN EN CURSO</div>
                                     <div className="text-sm font-medium uppercase">{trade.type === 'BUY' ? 'COMPRANDO...' : 'VENDIENDO...'}</div>
                                 </div>
                                 <div className="text-sm font-medium ml-2">{(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s</div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">

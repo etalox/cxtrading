@@ -813,16 +813,13 @@
                 };
             }, [zoom, addNotification, activeTab, autopilot]); 
 
-            useEffect(() => {
+                        useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-                const resizeObserver = new ResizeObserver((entries) => {
-                    const entry = entries[0];
-                    if (!entry) return;
-                    const { width, height } = entry.contentRect;
-                    if (width === 0 || height === 0) return;
+
+                const updateSize = (width, height) => {
                     const canvas = canvasRef.current;
-                    if (canvas) {
+                    if (canvas && width > 0 && height > 0) {
                         const dpr = window.devicePixelRatio || 1;
                         canvas.width = width * dpr;
                         canvas.height = height * dpr;
@@ -830,7 +827,20 @@
                         canvas.style.height = `${height}px`;
                         isMobileRef.current = width < 768;
                     }
+                };
+
+                // 1. Ejecutar inmediatamente con el tamaño actual
+                const rect = container.getBoundingClientRect();
+                updateSize(rect.width, rect.height);
+
+                // 2. Configurar Observer para cambios futuros
+                const resizeObserver = new ResizeObserver((entries) => {
+                    const entry = entries[0];
+                    if (!entry) return;
+                    const { width, height } = entry.contentRect;
+                    updateSize(width, height);
                 });
+                
                 resizeObserver.observe(container);
                 return () => resizeObserver.disconnect();
             }, []);

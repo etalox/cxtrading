@@ -245,7 +245,86 @@
                 } 
             };
 
-            const processMarketLogic = (isWarmup = false) => { const state = marketState.current; const volFactor = state.currentValue * 0.002; state.ticksSincePatternChange++; if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { state.ticksSincePatternChange = 0; if (state.patternState === 'NORMAL') { state.patternState = 'STRUCTURED'; state.structTotalDuration = Math.floor(120 + Math.random() * 240); state.nextPatternSwitchTick = state.structTotalDuration; state.structElapsed = 0; state.structPeriodX = Math.floor((5 + Math.random() * 20) * TICK_RATE); state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN'; state.structTimer = 0; state.currentStructLimit = state.structPeriodX; } else { state.patternState = 'NORMAL'; state.nextPatternSwitchTick = Math.floor(240 + Math.random() * 240); state.targetProb = 0.5; state.probStep = 0; } } let direction = state.lastDirection; if (state.patternState === 'STRUCTURED') { state.structTimer++; if (state.structTimer >= state.currentStructLimit) { state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; state.structTimer = 0; state.currentStructLimit = Math.floor((5 + Math.random() * 20) * TICK_RATE); } const targetDir = state.structPhase === 'UP' ? 1 : -1; direction = (Math.random() < 0.75) ? targetDir : -targetDir; } else { state.cycleCounter++; if (state.cycleCounter >= state.cycleDuration) { state.cycleCounter = 0; const changeRoll = Math.random(); let newTarget = 0.5; if (changeRoll < 0.6) { const d = Math.random() > 0.5 ? 1 : -1; newTarget = (d === 1) ? 0.65 : 0.35; } state.targetProb = newTarget; state.probStep = (state.targetProb - state.currentProb) / state.cycleDuration; } state.currentProb += state.probStep; direction = (Math.random() > state.currentProb) ? -state.lastDirection : state.lastDirection; } state.currentValue += direction * (volFactor * (0.5 + Math.random())); if (state.currentValue < 10) state.currentValue = 10; if (isWarmup) state.visualValue = state.currentValue; state.lastDirection = direction; updatePredictor(state.currentValue); };
+            const processMarketLogic = (isWarmup = false) => { 
+            const state = marketState.current; 
+            
+            // 1. GESTIÓN DE ESTRUCTURA MACRO (Tendencia vs Rango)
+            state.ticksSincePatternChange++; 
+            if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { 
+                state.ticksSincePatternChange = 0; 
+                
+                // 30% Probabilidad de entrar en "MOMENTUM" (Movimiento fuerte direccional)
+                // 40% Estructura ZigZag
+                // 30% Rango/Ruido Normal
+                const randState = Math.random();
+
+                if (randState < 0.3) {
+                    state.patternState = 'MOMENTUM'; // Nuevo estado: Gran subida o caída
+                    state.structTotalDuration = Math.floor(60 + Math.random() * 120); // Corto y explosivo (30s - 1m)
+                    state.momentumDir = Math.random() > 0.5 ? 1 : -1; // Dirección única fuerte
+                } else if (randState < 0.7) { 
+                    state.patternState = 'STRUCTURED'; // ZigZag normal
+                    state.structTotalDuration = Math.floor(180 + Math.random() * 300); 
+                    state.structPeriodX = Math.floor((15 + Math.random() * 25) * TICK_RATE); 
+                    state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN'; 
+                    state.structTimer = 0; 
+                    state.currentStructLimit = state.structPeriodX; 
+                } else { 
+                    state.patternState = 'NORMAL'; 
+                    state.structTotalDuration = Math.floor(120 + Math.random() * 180); 
+                }
+                state.nextPatternSwitchTick = state.structTotalDuration; 
+            } 
+
+            // 2. DEFINIR FUERZAS
+            let drift = 0; 
+            let volatilityMult = 1.0;
+
+            if (state.patternState === 'MOMENTUM') {
+                // Lógica de Ruptura/Crash: Mucha fuerza direccional, poca duda.
+                // Drift alto (0.8) supera casi siempre al ruido.
+                drift = state.momentumDir * 0.8; 
+                volatilityMult = 2.5; // Alta volatilidad (velas grandes)
+            } 
+            else if (state.patternState === 'STRUCTURED') { 
+                state.structTimer++; 
+                if (state.structTimer >= state.currentStructLimit) { 
+                    state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; 
+                    state.structTimer = 0; 
+                    state.currentStructLimit = Math.floor((10 + Math.random() * 40) * TICK_RATE); 
+                } 
+                // Tendencia suave
+                drift = state.structPhase === 'UP' ? 0.25 : -0.25; 
+                volatilityMult = 1.0; 
+            } else { 
+                // Rango lateral
+                drift = 0; 
+                volatilityMult = 0.8; // Mercado calmado
+            } 
+
+            // 3. RUIDO GAUSSIANO (Textura realista)
+            const r1 = Math.random();
+            const r2 = Math.random();
+            // Ruido concentrado pero con colas (-1 a 1 aprox)
+            const noise = (r1 + r2) - 1.0; 
+
+            // 4. CÁLCULO FINAL: Drift (Intención) + Ruido (Realismo)
+            const baseVol = state.currentValue * 0.0006; 
+            
+            // Aquí está la magia:
+            // En MOMENTUM: El drift (0.8) domina al noise (avg 0.0). Resultado: Sube casi siempre, pero varía la intensidad.
+            // En STRUCTURED: Drift (0.25) vs Noise (avg 0.0). Resultado: Sube con retrocesos frecuentes.
+            const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult;
+
+            state.currentValue += movement; 
+            
+            // Límites y actualización
+            if (state.currentValue < 10) state.currentValue = 10; 
+            if (isWarmup) state.visualValue = state.currentValue; 
+            state.lastDirection = movement > 0 ? 1 : -1; 
+            updatePredictor(state.currentValue); 
+        };
+
             const updateVisualCandleLogic = () => { const state = marketState.current; state.visualTicks.push(state.visualValue); if (state.visualTicks.length >= state.ticksPerCandle) { const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; const close = state.visualTicks[state.visualTicks.length - 1]; state.candles.push({ open: lastCandleClose, close, high: Math.max(...state.visualTicks, lastCandleClose), low: Math.min(...state.visualTicks, lastCandleClose), color: close >= lastCandleClose ? '#10b981' : '#f43f5e', }); state.targetScroll = state.candles.length; state.visualTicks = []; if (state.candles.length > 1500) state.candles.shift(); } };
             const warmUpMarket = (minutes = 10) => { const state = marketState.current; const ticksToSimulate = minutes * 60 * TICK_RATE; for (let i = 0; i < ticksToSimulate; i++) { processMarketLogic(true); updateVisualCandleLogic(); } state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; setCurrentPriceUI(state.visualValue); };
             

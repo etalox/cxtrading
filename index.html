@@ -26,7 +26,7 @@
         .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 40px; transition: all 0.2s ease; }
         .glass-button:active { transform: scale(0.96); }
 
-        .zoom-slider { -webkit-appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
+        .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
     </style>
 <body>
@@ -36,14 +36,14 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         const ICONS = {
-            search: './png/search.png',
-            loader: './png/loader.png',
-            trendingUp: './png/buy.png',
-            trendingDown: './png/sell.png',
-            wifiOff: './png/wifiOff.png',
-            activityWin: './png/win.png',
-            activityLoss: './png/loss.png',
-            activityNeutral: './png/neutral.png',
+            search: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/search.png',
+            loader: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loader.png',
+            trendingUp: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/buy.png',
+            trendingDown: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/sell.png',
+            wifiOff: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/wifiOff.png',
+            activityWin: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/win.png',
+            activityLoss: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loss.png',
+            activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
         };
 
         const MarketSim = () => {

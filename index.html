@@ -51,11 +51,11 @@
         const ICONS = {
             search: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/search.png',
             loader: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loader.png',
-            trendingUp: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/buy.png',
-            trendingDown: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/sell.png',
+            trendingUp: './svg/up.svg',
+            trendingDown: './svg/up.svg',
             wifiOff: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/wifiOff.png',
-            activityWin: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/win.png',
-            activityLoss: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loss.png',
+            activityWin: './svg/up.svg',
+            activityLoss: './svg/up.svg',
             activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
         };
 
@@ -734,14 +734,21 @@
 
                         {notifications.map(note => {
                             let iconSrc = ICONS.activityNeutral;
-                            if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                            let iconClass = "w-5 h-5";
+                            let iconStyle = {};
+
+                            if(note.type === 'SIGNAL') {
+                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleX(-1)' : 'none' };
+                            }
+
                             return (
                                 <div 
                                     key={note.id} 
                                     onClick={() => handleNotificationClick(note)}
                                     className={`glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''}`}
                                 >
-                                    <img src={iconSrc} className="w-5 h-5" />
+                                    <img src={iconSrc} className={iconClass} style={iconStyle} />
                                     <div className="flex flex-col justify-center items-start gap-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
                                             {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'NOTIFICACIÓN'}
@@ -760,11 +767,12 @@
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
                             const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
                             const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
+                            const iconStyle = isBuy ? {} : { transform: 'scaleX(-1)' };
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
                                     <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0" />
+                                        <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
                                     </div>
                                     <div className="flex flex-col justify-center items-start gap-1.5">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
@@ -846,7 +854,7 @@
                                     disabled={tradesDisabled}
                                     className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    <img src={ICONS.trendingUp} className="w-5 h-5" />
+                                    <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
                                     <div className="flex flex-col items-start gap-0 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
                                         <div className="text-sm font-medium">BUY / {currentDuration}s.</div>
@@ -858,7 +866,7 @@
                                     disabled={tradesDisabled}
                                     className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    <img src={ICONS.trendingDown} className="w-5 h-5" />
+                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleX(-1)' }} />
                                     <div className="flex flex-col items-start gap-0 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
                                         <div className="text-sm font-medium">SELL / {currentDuration}s.</div>

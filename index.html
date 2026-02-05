@@ -576,7 +576,7 @@
                 };
 
                 // Función de Catch-up (Relleno de tiempo perdido)
-                const performCatchUp = () => {
+                 const performCatchUp = () => {
                     const now = Date.now();
                     const timeMissed = now - lastLogicTimeRef.current;
                     const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
@@ -593,6 +593,33 @@
                         // Si pasó demasiado tiempo, simplemente reseteamos (teletransporte)
                         lastLogicTimeRef.current = now;
                     }
+
+                    const performCatchUp = () => {
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+                    
+                    if (ticksMissed > 0 && ticksMissed < 10000) {
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                        
+                        // --- CORRECCIÓN CLAVE ---
+                        // Forzamos la actualización inmediata del scroll para que la cámara salte a las nuevas velas
+                        // Aplicamos esto a las 3 pestañas para que no se descuadren
+                        [0, 1, 2].forEach(idx => {
+                            const s = marketStatesRef.current[idx];
+                            s.targetScroll = s.candles.length; 
+                            s.scrollOffset = s.candles.length; // Salto instantáneo, sin suavizado
+                            s.visualValue = s.currentValue; // Sincronizar valor visual con lógico
+                        });
+                        
+                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
+                    } else if (ticksMissed >= 10000) {
+                        lastLogicTimeRef.current = now;
+                    }
+                };
+
                 };
 
                 // Listeners de Eventos

@@ -479,7 +479,8 @@
             };
             
             const handleGenerateAsset = () => { 
-                if (isGenerating) return; 
+                // Añadimos !isOnline para evitar que funcione sin internet
+                if (isGenerating || !isOnline) return; 
                 setIsGenerating(true); 
                 setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
@@ -554,6 +555,15 @@
                 };
 
                 const drawLoop = () => {
+                    animationId = requestAnimationFrame(drawLoop);
+
+                    if (!navigator.onLine || document.hidden) {
+                        return;
+                    }
+
+                    const now = Date.now();
+                    const state = marketStatesRef.current[activeTab];
+                    
                     animationId = requestAnimationFrame(drawLoop);
                     
                     const now = Date.now();
@@ -986,8 +996,9 @@
                             
                             <button 
                                 onClick={handleGenerateAsset} 
-                                disabled={isGenerating}
-                                className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                                // Se desactiva si está generando O si no hay internet
+                                disabled={isGenerating || !isOnline}
+                                className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <div className="w-5 h-5 flex items-center justify-center">
                                     <img 
@@ -1000,7 +1011,7 @@
                                         {isMobile ? 'EXPLORACIÓN' : 'EXPLORAR'}
                                     </div>
                                     <div className="text-white text-sm font-normal uppercase whitespace-nowrap">
-                                        {isGenerating ? 'BUSCANDO...' : 'NUEVO ACTIVO'}
+                                        {!isOnline ? 'SIN RED' : (isGenerating ? 'BUSCANDO...' : 'NUEVO ACTIVO')}
                                     </div>
                                 </div>
                             </button>

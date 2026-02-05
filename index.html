@@ -513,7 +513,7 @@
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         
                                                 // --- FÍSICA UNIFICADA (Evita jitter/saltos) ---
-                        const SMOOTHING = 0.1; 
+                        const SMOOTHING = 0.05; 
                         
                         // 1. Suavizado de Precio
                         state.visualValue += (state.currentValue - state.visualValue) * 0.3; // Precio puede ser más rápido

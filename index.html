@@ -435,16 +435,21 @@
                             const progress = age / 2000;
                             const yPos = getY(label.price) - 30 - (progress * 50); // Sube 50px
                             const xPos = getX(label.xIndex);
-                            const opacity = 1 - Math.pow(progress, 3); // Fade out suave
+                            const opacity = 1 - Math.pow(progress, 3); // Fade out
 
                             ctx.globalAlpha = opacity;
                             const bg = label.type === 'WIN' ? '#10B981' : '#F43F5E';
                             
+                            // Definir color de sombra dinámico
+                            const shadowColor = label.type === 'WIN' 
+                                ? 'rgba(16, 185, 129, 0.40)'  // Sombra verde para WIN
+                                : 'rgba(244, 63, 94, 0.40)';  // Sombra roja para LOSS
+
                             // Replicar diseño de Figma
                             ctx.fillStyle = bg;
                             ctx.shadowBlur = 20;
-                            ctx.shadowColor = 'rgba(244, 63, 94, 0.20)'; // Sombra roja sutil como en diseño
-                            
+                            ctx.shadowColor = shadowColor;
+
                             // Rectángulo redondeado
                             const labelW = 100;
                             const labelH = 40;

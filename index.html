@@ -551,23 +551,39 @@
                         allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
                         if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
                         
-                        const range = maxPrice - minPrice || 10;
-                        const padding = range * 0.45;
-                        let targetYMax = maxPrice + padding;
-                        let targetYMin = minPrice - padding;
-                        const pixelHeight = height;
-                        const priceRange = targetYMax - targetYMin;
-                        const pixelsPerPrice = pixelHeight / priceRange;
-                        const rawY = pixelHeight - ((state.visualValue - targetYMin) / (targetYMax - targetYMin)) * pixelHeight;
-                        const safeZoneBottom = Math.min(height - 250, height * 0.65);
-                        let neededShift = 0;
-                        if (rawY > safeZoneBottom) {
-                            const pixelsOff = rawY - safeZoneBottom;
-                            neededShift = pixelsOff / pixelsPerPrice;
+                                                // --- SUAVIZADO DEL ESCALADO VERTICAL (Eje Y) ---
+                        if (typeof state.visualMinPrice === 'undefined') {
+                            state.visualMinPrice = minPrice;
+                            state.visualMaxPrice = maxPrice;
                         }
-                        state.verticalShift += (neededShift - state.verticalShift) * 0.2;
-                        const yMax = targetYMax - state.verticalShift;
-                        const yMin = targetYMin - state.verticalShift;
+
+                        const rawRange = maxPrice - minPrice || 10;
+                        const targetPadding = rawRange * 0.45;
+                        const targetMin = minPrice - targetPadding;
+                        const targetMax = maxPrice + targetPadding;
+
+                        const VERTICAL_SMOOTHING = 0.05; 
+                        state.visualMinPrice += (targetMin - state.visualMinPrice) * VERTICAL_SMOOTHING;
+                        state.visualMaxPrice += (targetMax - state.visualMaxPrice) * VERTICAL_SMOOTHING;
+
+                        let yMin = state.visualMinPrice;
+                        let yMax = state.visualMaxPrice;
+
+                        // Safe Zone Logic (Integrada)
+                        const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
+                        const safeZoneBottom = Math.min(height - 250, height * 0.65);
+                        
+                        if (currentPriceY > safeZoneBottom) {
+                            const pixelsOff = currentPriceY - safeZoneBottom;
+                            const pricePerPixel = (yMax - yMin) / height;
+                            const priceShift = pixelsOff * pricePerPixel;
+                            
+                            state.visualMinPrice -= priceShift * 0.1;
+                            state.visualMaxPrice -= priceShift * 0.1;
+                            
+                            yMin = state.visualMinPrice;
+                            yMax = state.visualMaxPrice;
+                        }
                         
                         const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
                         const currentY = getY(state.visualValue);

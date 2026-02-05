@@ -26,9 +26,14 @@
         .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 40px; transition: all 0.2s ease; }
         .glass-button:active { transform: scale(0.96); }
         
-        /* Estilos específicos para las Tabs nuevas */
         .tab-item { transition: all 0.2s ease; cursor: pointer; }
         .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
+
+        /* Toggle Switch */
+        .toggle-switch { position: relative; width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; transition: background 0.3s; }
+        .toggle-switch.active { background: #10B981; }
+        .toggle-knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.3s; }
+        .toggle-switch.active .toggle-knob { transform: translateX(20px); }
 
         .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
@@ -93,7 +98,7 @@
                 if (!container) return () => window.removeEventListener('resize', updateMobile);
 
                 const isInteractive = (node) => {
-                    try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item'); } catch (e) { return false; }
+                    try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; }
                 };
 
                 const onWheel = (e) => {
@@ -104,7 +109,6 @@
                     setZoom(z => Math.max(80, Math.min(350, Math.round(z * factor))));
                 };
 
-                // ... Touch listeners omitted for brevity, same as before ...
                 let touchActive = false;
                 const onTouchStart = (e) => {
                     if (e.touches && e.touches.length === 2) {
@@ -156,8 +160,10 @@
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
+            const [autopilot, setAutopilot] = useState(false); // NUEVO: Piloto Automático
             
             const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
+            const lastSignalRef = useRef(null); // Para evitar duplicados en autopilot
             
             const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
             const resultLabelsRef = useRef([]);
@@ -226,10 +232,21 @@
                 const confidence = sigmoid(rawSum); 
                 ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; 
                 setAiConfidence(confidence); 
+                
                 if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
                     if (Math.random() < 0.1) { 
-                        addNotification({ type: 'SIGNAL', signalType: finalBuy ? 'BUY' : 'SELL', confidence: confidence, price: newPrice }); 
-                        state.lastSignalTick = state.currentValue; 
+                        const signalType = finalBuy ? 'BUY' : 'SELL';
+                        addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
+                        state.lastSignalTick = state.currentValue;
+                        
+                        // AUTOPILOT: Ejecutar automáticamente si está activo y confianza >60%
+                        if (autopilot && confidence > 0.6 && activeTradesRef.current.length < 4) {
+                            const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
+                            if (lastSignalRef.current !== currentSignal) { // Evitar duplicados
+                                lastSignalRef.current = currentSignal;
+                                setTimeout(() => executeTrade(signalType), 100); // Pequeño delay para suavidad
+                            }
+                        }
                     } 
                 } 
             };
@@ -348,9 +365,8 @@
                 if (!isOnline) return; 
                 if (activeTradesRef.current.length >= 4) return;
                 
-                // --- 2. ELIMINAR NOTIFICACIÓN DE SEÑAL SI EXISTE ---
                 setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
-                isNotificationVisible.current = false; // Resetear flag para que entren nuevas
+                isNotificationVisible.current = false; 
                 
                 const state = marketStatesRef.current[activeTab]; 
                 const ks = kinematicsRef.current[activeTab];
@@ -373,6 +389,13 @@
                 activeTradesRef.current.push(newTrade); 
                 setActiveTradesUI([...activeTradesRef.current]); 
                 setBalance(prev => prev - INVESTMENT_AMOUNT); 
+            };
+
+            // NUEVO: Click en Notificación
+            const handleNotificationClick = (notification) => {
+                if (notification.type === 'SIGNAL') {
+                    executeTrade(notification.signalType);
+                }
             };
             
             useEffect(() => {
@@ -623,7 +646,7 @@
                     clearInterval(logicInterval);
                     cancelAnimationFrame(animationId);
                 };
-            }, [zoom, addNotification, activeTab]); 
+            }, [zoom, addNotification, activeTab, autopilot]); 
 
             useEffect(() => {
                 const container = containerRef.current;
@@ -649,6 +672,9 @@
 
             const sliderPercentage = ((zoom - 80) / (350 - 80)) * 100;
 
+            // NUEVO: Calcular si los botones de trading deben estar deshabilitados
+            const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= 4;
+
             return (
                 <div className="flex flex-col h-screen relative bg-[#050505] text-white font-sans overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
@@ -660,7 +686,6 @@
                             <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
                         </div>
 
-                        {/* --- NEW TABS DESIGN IMPLEMENTATION --- */}
                         <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
                             {assetsInfo.map((info, idx) => {
                                 const isActive = activeTab === idx;
@@ -670,9 +695,7 @@
                                         onClick={() => handleTabChange(idx)}
                                         className={`
                                             tab-item h-[60px] px-10 rounded-2xl flex items-center justify-center gap-[10px]
-                                            ${isActive 
-                                                ? 'border border-white' 
-                                                : 'border border-white/40'}
+                                            ${isActive ? 'border border-white' : 'border border-white/40'}
                                             overflow-hidden
                                         `}
                                     >
@@ -692,7 +715,6 @@
                             })}
                         </div>
 
-                        {/* MOBILE TITLE */}
                         <div className="flex md:hidden items-center gap-2">
                              <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-green-500 animate-pulse' : 'bg-[#D9D9D9]'}`} />
                              <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetsInfo[activeTab].name}</div>
@@ -719,7 +741,11 @@
                             let iconSrc = ICONS.activityNeutral;
                             if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
                             return (
-                                <div key={note.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
+                                <div 
+                                    key={note.id} 
+                                    onClick={() => handleNotificationClick(note)}
+                                    className={`glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/10 transition-all' : ''}`}
+                                >
                                     <img src={iconSrc} className="w-5 h-5" />
                                     <div className="flex flex-col justify-center items-start gap-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
@@ -775,7 +801,6 @@
                     <div className="absolute bottom-6 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
                         <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                             
-                            {/* 1. EXPLORAR (TEXTO UNIFICADO) */}
                             <button 
                                 onClick={handleGenerateAsset} 
                                 className={`glass-button w-full md:w-[280px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
@@ -796,8 +821,20 @@
                                 </div>
                             </button>
 
-                            {/* 2. ZOOM */}
-                            <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-2 order-3 md:order-2">
+                            {/* NUEVO: AUTOPILOT TOGGLE (Solo Desktop) */}
+                            {!isMobile && (
+                                <div className="glass-button h-16 px-6 flex items-center gap-4 order-2 cursor-pointer" onClick={() => setAutopilot(!autopilot)}>
+                                    <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
+                                        <div className="toggle-knob"></div>
+                                    </div>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">PILOTO AUTOMÁTICO</div>
+                                        <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-2 order-3 md:order-3">
                                 <div className="w-full h-[2px] bg-[#333] rounded-full absolute top-1/2 transform -translate-y-1/2"></div>
                                 <div 
                                     className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
@@ -806,9 +843,12 @@
                                 <input type="range" min="80" max="350" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="zoom-slider" />
                             </div>
 
-                            {/* 3. OPERACIONES */}
-                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-3">
-                                <button onClick={() => executeTrade('BUY')} className="flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b]">
+                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-4">
+                                <button 
+                                    onClick={() => executeTrade('BUY')} 
+                                    disabled={tradesDisabled}
+                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
                                     <img src={ICONS.trendingUp} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
@@ -816,7 +856,11 @@
                                     </div>
                                 </button>
                                 
-                                <button onClick={() => executeTrade('SELL')} className="flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573]">
+                                <button 
+                                    onClick={() => executeTrade('SELL')} 
+                                    disabled={tradesDisabled}
+                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
                                     <img src={ICONS.trendingDown} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">
                                         <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>

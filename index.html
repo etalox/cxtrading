@@ -509,17 +509,33 @@
                 if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
             };
 
-                        // --- GESTIÓN DE CONEXIÓN A INTERNET ---
+            // --- GESTIÓN DE CONEXIÓN A INTERNET ---
             useEffect(() => {
                 const handleOnline = () => {
                     setIsOnline(true);
-                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE')); // Quitar aviso de offline
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
+                    
+                    // --- LÓGICA DE CATCH-UP AL VOLVER LA RED ---
+                    const now = Date.now();
+                    // Calculamos cuánto tiempo estuvimos offline
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+                    
+                    // Si estuvimos offline menos de ~16 min (10000 ticks), simulamos el paso del tiempo
+                    if (ticksMissed > 0 && ticksMissed < 10000) { 
+                        // Ejecutamos la lógica en bucle rápido para "rellenar" el hueco
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                    } 
+                    // Actualizamos la referencia temporal al presente
+                    lastLogicTimeRef.current = now; 
                 };
                 
                 const handleOffline = () => {
                     setIsOnline(false);
-                    // Mostrar notificación persistente
                     addNotification({ type: 'OFFLINE' });
+                    // No tocamos lastLogicTimeRef aquí para que se quede "congelado" en el momento de la desconexión
                 };
 
                 window.addEventListener('online', handleOnline);
@@ -531,10 +547,16 @@
                 };
             }, [addNotification]);
             
+            // --- MAIN LOOP UNIFICADO ---
             useEffect(() => {
                 let animationId;
                 const LOGIC_RATE_MS = 1000 / TICK_RATE;
+                
+                // Usamos referencias mutables para mantener estado entre frames
+                const lastLogicTimeRef = { current: Date.now() };
+                const isTabVisibleRef = { current: !document.hidden };
 
+                // Lógica del Mercado (Reutilizable)
                 const runMarketLogic = () => {
                     processMarketLogic(0); updateVisualCandleLogic(0);
                     processMarketLogic(1); updateVisualCandleLogic(1);
@@ -553,56 +575,100 @@
                     }
                 };
 
-                const drawLoop = () => {
-
-                    // Si no hay internet o la pestaña no es visible, NO actualizamos la vista
-                    if (!navigator.onLine || document.hidden) {
-                    return;
-    }
+                // Función de Catch-up (Relleno de tiempo perdido)
+                const performCatchUp = () => {
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
                     
-                    animationId = requestAnimationFrame(drawLoop);
+                    // Si perdimos tiempo (pero no una eternidad > 15 min)
+                    if (ticksMissed > 0 && ticksMissed < 10000) {
+                        // Ejecutamos la lógica N veces instantáneamente
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                        // Avanzamos el reloj lógico para que coincida con el ahora
+                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
+                    } else if (ticksMissed >= 10000) {
+                        // Si pasó demasiado tiempo, simplemente reseteamos (teletransporte)
+                        lastLogicTimeRef.current = now;
+                    }
+                };
+
+                // Listeners de Eventos
+                const handleVisibilityChange = () => {
+                    isTabVisibleRef.current = !document.hidden;
+                    if (isTabVisibleRef.current && navigator.onLine) {
+                        performCatchUp();
+                    }
+                };
+
+                const handleOnline = () => {
+                    setIsOnline(true);
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
+                    if (isTabVisibleRef.current) {
+                        performCatchUp(); // <--- AQUÍ ESTÁ LA MAGIA QUE FALTABA
+                    }
+                };
+
+                const handleOffline = () => {
+                    setIsOnline(false);
+                    addNotification({ type: 'OFFLINE' });
+                    // No actualizamos lastLogicTimeRef, dejamos que se quede atrás
+                };
+
+                document.addEventListener("visibilitychange", handleVisibilityChange);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                // LOOP PRINCIPAL (DIBUJO + LÓGICA)
+                const loop = () => {
+                    animationId = requestAnimationFrame(loop);
                     
                     const now = Date.now();
                     
-                    // Si la pestaña no es visible, detener renderizado (ahorra batería/CPU)
-                    if (!isTabVisibleRef.current) return;
+                    // Si estamos offline o minimizados, NO corremos lógica ni dibujo
+                    // Esto "congela" el lastLogicTimeRef en el pasado
+                    if (!navigator.onLine || !isTabVisibleRef.current) return;
 
-                    // --- LÓGICA DE TIEMPO / CATCH-UP ---
-                    // Calculamos cuánto tiempo ha pasado desde la última vez que corrió la lógica
-                    let deltaTime = now - lastLogicTimeRef.current;
-                    let ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
-                    
-                    // Si hay demasiados ticks acumulados (ej. por minimizar), activar modo catch-up
-                    if (ticksToProcess > 2000) { 
-                        // Limitar para evitar cuelgues extremos, pero marcar pendiente
-                        ticksToProcess = 2000; 
-                        lastLogicTimeRef.current = now; // Resetear reloj
-                    }
-
-                    if (ticksToProcess > 0) {
-                        // Si hay muchos ticks, procesar varios por frame para "ponernos al día" rápidamente
-                        // pero no todos de golpe para ver la animación acelerada
-                        const MAX_TICKS_PER_FRAME = 8; 
+                    // Lógica Normal (Paso a paso)
+                    const deltaTime = now - lastLogicTimeRef.current;
+                    if (deltaTime >= LOGIC_RATE_MS) {
+                        const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
+                        // Límite de seguridad por si el frame rate cae mucho
+                        const safeTicks = Math.min(ticksToProcess, 10); 
                         
-                        let ticksForThisFrame = ticksToProcess;
-                        if (ticksToProcess > 10) {
-                            // Si estamos muy atrasados, solo procesamos un lote y dejamos el resto para el siguiente frame
-                            // Esto crea el efecto de "avance rápido"
-                            ticksForThisFrame = MAX_TICKS_PER_FRAME;
-                            isCatchingUpRef.current = true;
-                        } else {
-                            isCatchingUpRef.current = false;
-                        }
-
-                        for (let i = 0; i < ticksForThisFrame; i++) {
+                        for (let i = 0; i < safeTicks; i++) {
                             runMarketLogic();
                         }
+                        lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;
                         
-                        // Avanzamos el reloj lógico solo lo que procesamos
-                        lastLogicTimeRef.current += ticksForThisFrame * LOGIC_RATE_MS;
+                        // Procesar Trades Expirados
+                        const realNow = Date.now();
+                        const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
+                        if (expiredTrades.length > 0) {
+                            let totalPayout = 0;
+                            expiredTrades.forEach(trade => {
+                                const tradeState = marketStatesRef.current[trade.tabIndex];
+                                const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
+                                if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
+                                if (trade.tabIndex === activeTab) {
+                                    const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
+                                    resultLabelsRef.current.push({
+                                        id: Date.now() + Math.random(), xIndex: currentPreciseIndex,
+                                        price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount,
+                                        timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS'
+                                    });
+                                }
+                                if (isWin) { totalPayout += trade.amount * 1.85; }
+                            });
+                            activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
+                            setActiveTradesUI([...activeTradesRef.current]);
+                            if (totalPayout > 0) setBalance(b => b + totalPayout);
+                        }
                     }
 
-                    // --- RENDERIZADO VISUAL ---
+                    // Renderizado (UI Updates)
                     const state = marketStatesRef.current[activeTab]; 
                     if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
                         setCurrentPriceUI(state.visualValue);
@@ -610,22 +676,21 @@
                         lastUIUpdateRef.current = now;
                     }
 
+                    // --- AQUI VA TU CÓDIGO DE CANVAS / DIBUJO ---
+                    // (Pega aquí todo el bloque 'const canvas = canvasRef.current ...' hasta el final del dibujo)
                     const canvas = canvasRef.current;
                     if (canvas) {
-                        const dpr = window.devicePixelRatio || 1;
+                         const dpr = window.devicePixelRatio || 1;
                         const width = canvas.width / dpr;
                         const height = canvas.height / dpr;
                         const ctx = canvas.getContext('2d');
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                         
-                        // FÍSICA SUAVE
-                        const SMOOTHING = 0.05; 
+                        const SMOOTHING = 0.05;
                         state.visualValue += (state.currentValue - state.visualValue) * 0.3;
                         state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
-                        
                         ctx.fillStyle = '#050505';
                         ctx.fillRect(0, 0, width, height);
-                        
                         const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
                         let allCandles = [...state.candles];
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
@@ -644,31 +709,25 @@
                         if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
                         state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * SMOOTHING;
                         const anchorX = width * state.currentAnchor;
-
                         const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
+                        
                         let minPrice = Infinity, maxPrice = -Infinity;
                         allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
                         if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
-                        
-                        // SUAVIZADO VERTICAL
-                        if (typeof state.visualMinPrice === 'undefined') {
-                            state.visualMinPrice = minPrice;
-                            state.visualMaxPrice = maxPrice;
-                        }
+
+                        if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
                         const rawRange = maxPrice - minPrice || 10;
                         const targetPadding = rawRange * 0.45;
                         const targetMin = minPrice - targetPadding;
                         const targetMax = maxPrice + targetPadding;
-                        
-                        state.visualMinPrice += (targetMin - state.visualMinPrice) * SMOOTHING;
-                        state.visualMaxPrice += (targetMax - state.visualMaxPrice) * SMOOTHING;
-                        
+                        const VERTICAL_SMOOTHING = 0.05; 
+                        state.visualMinPrice += (targetMin - state.visualMinPrice) * VERTICAL_SMOOTHING;
+                        state.visualMaxPrice += (targetMax - state.visualMaxPrice) * VERTICAL_SMOOTHING;
                         let yMin = state.visualMinPrice;
                         let yMax = state.visualMaxPrice;
 
                         const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
                         const safeZoneBottom = Math.min(height - 250, height * 0.65);
-                        
                         if (currentPriceY > safeZoneBottom) {
                             const pixelsOff = currentPriceY - safeZoneBottom;
                             const pricePerPixel = (yMax - yMin) / height;
@@ -694,7 +753,6 @@
                         const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
                         const xFuture = getX(futureIndex);
                         const xCurrent = getX(currentPreciseIndex);
-                        
                         ctx.strokeStyle = activeTrades.length > 0 ? '#333' : '#666'; 
                         ctx.lineWidth = 1;
                         ctx.setLineDash([2, 4]);
@@ -757,29 +815,6 @@
                             ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
                             ctx.fill();
                         });
-                        
-                        // Procesar trades expirados
-                        const expiredTrades = activeTradesRef.current.filter(t => now >= t.expiryTime);
-                        if (expiredTrades.length > 0) {
-                            let totalPayout = 0;
-                            expiredTrades.forEach(trade => {
-                                const tradeState = marketStatesRef.current[trade.tabIndex];
-                                const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
-                                if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
-                                if (trade.tabIndex === activeTab) {
-                                    const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
-                                    resultLabelsRef.current.push({
-                                        id: Date.now() + Math.random(), xIndex: currentPreciseIndex,
-                                        price: tradeState.visualValue, profit: isWin ? trade.amount * 0.85 : -trade.amount,
-                                        timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS'
-                                    });
-                                }
-                                if (isWin) { totalPayout += trade.amount * 1.85; }
-                            });
-                            activeTradesRef.current = activeTradesRef.current.filter(t => now < t.expiryTime);
-                            setActiveTradesUI([...activeTradesRef.current]);
-                            if (totalPayout > 0) setBalance(b => b + totalPayout);
-                        }
 
                         resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); 
                         resultLabelsRef.current.forEach(label => {
@@ -822,12 +857,15 @@
                 };
                 
                 lastLogicTimeRef.current = Date.now();
-                drawLoop();
-                
+                loop(); // Iniciamos el loop unificado
+
                 return () => {
                     cancelAnimationFrame(animationId);
+                    document.removeEventListener("visibilitychange", handleVisibilityChange);
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
                 };
-            }, [zoom, addNotification, activeTab, autopilot]); 
+            }, [zoom, addNotification, activeTab, autopilot]);
 
             useEffect(() => {
                 const container = containerRef.current;

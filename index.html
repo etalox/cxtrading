@@ -13,9 +13,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Regular.woff') format('woff'); font-weight: 400; font-display: swap; }
-        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Medium.woff') format('woff'); font-weight: 500; font-display: swap; }
-        @font-face { font-family: 'BDO Grotesk'; src: url('https://fonts.cdnfonts.com/s/29457/BDOGrotesk-Bold.woff') format('woff'); font-weight: 700; font-display: swap; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+        @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
 
         * { font-family: 'BDO Grotesk', sans-serif !important; }
         body { margin: 0; background-color: #050505; color: white; font-family: 'BDO Grotesk', sans-serif; overflow: hidden; touch-action: none; }
@@ -102,7 +102,7 @@
                         </div>
                         <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-green-500 animate-pulse' : 'bg-[#D9D9D9]'}`} />
-                            <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCNDO...' : assetName}</div>
+                            <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetName}</div>
                         </div>
                         <div className="flex flex-col justify-center items-end gap-2">
                             <div className="opacity-50 text-[10px] font-normal leading-tight">MERCADO EN VIVO</div>

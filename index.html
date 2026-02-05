@@ -123,7 +123,7 @@
             const [notifications, setNotifications] = useState([]); 
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
             const [isGenerating, setIsGenerating] = useState(false); 
-            const [assetName, setAssetName] = useState("ORO NEGRO"); 
+            const [assetName, setAssetName] = useState("—"); 
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
@@ -150,140 +150,234 @@
             useEffect(() => { generateNewAsset(); }, [generateNewAsset]);
             const executeTrade = (type) => { if (!isOnline) return; const state = marketState.current; const ks = kinematicState.current; const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); const now = Date.now(); const newTrade = { id: Date.now() + Math.random(), type, entryPrice: state.visualValue, entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + TRADE_DURATION_MS, amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures } }; activeTradesRef.current.push(newTrade); setActiveTradesUI([...activeTradesRef.current]); setBalance(prev => prev - INVESTMENT_AMOUNT); };
             
-            useEffect(() => { let animationId; let logicInterval; const LOGIC_RATE_MS = 1000 / TICK_RATE; logicInterval = setInterval(() => { const now = Date.now(); if (!navigator.onLine) return; if (offlineStartRef.current !== 0) { offlineStartRef.current = 0; } if (!lastTimeRef.current) lastTimeRef.current = now; const deltaTime = now - lastTimeRef.current; let ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS); if (ticksToProcess > 0) { if (ticksToProcess > 2000) { ticksToProcess = 2000; lastTimeRef.current = now; } else { lastTimeRef.current += ticksToProcess * LOGIC_RATE_MS; } for (let i = 0; i < ticksToProcess; i++) { processMarketLogic(); updateVisualCandleLogic(); if (ticksToProcess < 50 || i % 10 === 0) { const ks = kinematicState.current; const state = marketState.current; const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0; const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0; if (isBuy || isSell) { aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: 20, featuresSnapshot: { ...ks.currentFeatures } }); } aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; }); } } } const realNow = Date.now(); const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime); if (expiredTrades.length > 0) { let totalPayout = 0; expiredTrades.forEach(trade => { const isWin = trade.type === 'BUY' ? marketState.current.visualValue > trade.entryPrice : marketState.current.visualValue < trade.entryPrice; if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0); if (isWin) { totalPayout += trade.amount * 1.85; addNotification({ profit: trade.amount * 0.85, type: 'WIN', tradeType: trade.type, entry: trade.entryPrice }); } else { addNotification({ profit: -trade.amount, type: 'LOSS', tradeType: trade.type, entry: trade.entryPrice }); } }); activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime); setActiveTradesUI([...activeTradesRef.current]); if (totalPayout > 0) setBalance(b => b + totalPayout); } }, 100); const drawLoop = () => { const now = Date.now(); if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) { setCurrentPriceUI(marketState.current.visualValue); lastUIUpdateRef.current = now; } const canvas = canvasRef.current; if (canvas) { const ctx = canvas.getContext('2d'); const state = marketState.current; const width = canvas.width, height = canvas.height; const priceSmoothing = 0.3; state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing; const horizontalSmoothing = 0.2; state.scrollOffset += (state.targetScroll - state.scrollOffset) * horizontalSmoothing; ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, width, height); const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue; let allCandles = [...state.candles]; allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true }); const candleWidth = width / zoom; const anchorX = width * 0.82; const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth; let minPrice = Infinity, maxPrice = -Infinity; allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } }); if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; } const range = maxPrice - minPrice || 10; const padding = range * 0.45; const yMax = maxPrice + padding, yMin = minPrice - padding; const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height; const currentY = getY(state.visualValue); ctx.strokeStyle = '#222'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, currentY); ctx.lineTo(width, currentY); ctx.stroke(); ctx.setLineDash([]); const barWidth = Math.max(1, candleWidth * 0.8); allCandles.forEach((candle, i) => { const x = getX(i); if (x < -candleWidth || x > width + candleWidth) return; const yOpen = getY(candle.open), yClose = getY(candle.close), yHigh = getY(candle.high), yLow = getY(candle.low); ctx.strokeStyle = candle.color; ctx.lineWidth = Math.max(1, candleWidth * 0.1); ctx.beginPath(); ctx.moveTo(x, yHigh); ctx.lineTo(x, yLow); ctx.stroke(); const bodyHeight = Math.max(0.5, Math.abs(yClose - yOpen)); ctx.fillStyle = candle.color; if (candle.isForming) { ctx.shadowBlur = 10; ctx.shadowColor = candle.color; } ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight); ctx.shadowBlur = 0; }); activeTradesRef.current.forEach(trade => { const yEntry = getY(trade.entryPrice); const xEntry = getX(trade.entryIndex); const remainingSeconds = (trade.expiryTime - Date.now()) / 1000; const futureIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle) + (remainingSeconds * TICK_RATE / state.ticksPerCandle); const xExpire = getX(futureIndex); const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e'; ctx.strokeStyle = tradeColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(xEntry, yEntry); ctx.lineTo(width, yEntry); ctx.stroke(); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(xExpire, yEntry - 40); ctx.lineTo(xExpire, yEntry + 40); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.moveTo(xEntry, yEntry); ctx.lineTo(xExpire, yEntry); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = tradeColor; ctx.beginPath(); ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2); ctx.fill(); }); ctx.fillStyle = '#111'; ctx.fillRect(width - 100, currentY - 10, 100, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center'; ctx.fillText(state.visualValue.toFixed(2), width - 50, currentY + 5); } animationId = requestAnimationFrame(drawLoop); }; lastTimeRef.current = Date.now(); drawLoop(); return () => { clearInterval(logicInterval); cancelAnimationFrame(animationId); }; }, [zoom, addNotification]); useEffect(() => { const handleResize = () => { if(containerRef.current && canvasRef.current) { canvasRef.current.width = containerRef.current.clientWidth; canvasRef.current.height = containerRef.current.clientHeight; } }; window.addEventListener('resize', handleResize); handleResize(); return () => window.removeEventListener('resize', handleResize); }, []);
-            
-            const sliderPercentage = ((zoom - 80) / (350 - 80)) * 100;
-
-            return (
-                <div className="flex flex-col h-screen relative bg-[#050505] text-white font-sans overflow-hidden">
-                    
-                    <div className="absolute top-10 left-0 w-full px-6 md:px-10 flex justify-between items-center z-10 pointer-events-none">
-                        <div className="flex flex-col justify-center items-start gap-2">
-                            <div className="opacity-50 text-[10px] font-normal leading-tight">BALANCE GLOBAL</div>
-                            <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-green-500 animate-pulse' : 'bg-[#D9D9D9]'}`} />
-                            <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetName}</div>
-                        </div>
-                        <div className="flex flex-col justify-center items-end gap-2">
-                            <div className="opacity-50 text-[10px] font-normal leading-tight">MERCADO EN VIVO</div>
-                            <div className="text-sm font-normal leading-tight">${currentPriceUI.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                        </div>
-                    </div>
-
-                    <div className="absolute top-0 left-0 w-full h-full z-0" ref={containerRef}>
-                        <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
-                    </div>
-
-                    <div className="absolute top-[120px] md:top-[105px] w-full flex flex-col items-center gap-4 z-20 pointer-events-none px-4">
-                        {!isOnline && (
-                            <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                                <img src={ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                                <div className="flex flex-col justify-center items-start gap-1">
-                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
-                                    <div className="text-sm font-medium">SIN CONEXIÓN Wi-Fi</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {notifications.map(note => {
-                            let iconSrc = ICONS.activityNeutral;
-                            if(note.type === 'WIN') iconSrc = ICONS.activityWin;
-                            if(note.type === 'LOSS') iconSrc = ICONS.activityLoss;
-                            if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                            return (
-                                <div key={note.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
-                                    <img src={iconSrc} className="w-5 h-5" />
-                                    <div className="flex flex-col justify-center items-start gap-1">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                            {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'OPERACIÓN TERMINADA'}
-                                        </div>
-                                        <div className="text-sm font-medium">
-                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : `${note.profit > 0 ? 'GANANCIA' : 'PÉRDIDA'} ${note.profit.toFixed(2)}`}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {activeTradesUI.map(trade => {
-                            const tradeIcon = trade.type === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                            return (
-                            <div key={trade.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
-                                <img src={tradeIcon} className="w-5 h-5 opacity-80" />
-                                <div className="flex flex-col justify-center items-start gap-1">
-                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">OPERACIÓN EN CURSO</div>
-                                    <div className="text-sm font-medium uppercase">{trade.type === 'BUY' ? 'COMPRANDO...' : 'VENDIENDO...'}</div>
-                                </div>
-                                <div className="text-sm font-medium ml-2">{(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s</div>
-                            </div>
-                            );
-                        })}
-                    </div>
-
-                    <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
-                         <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
-                         <div className="flex items-center gap-2">
-                            <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden">
-                                <div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div>
-                            </div>
-                            <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
-                         </div>
-                    </div>
-
-                    {/* Barra Inferior REORGANIZADA PARA CENTRAR ZOOM EN DESKTOP */}
-                    <div className="absolute bottom-6 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
-                        <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
-                            
-                            {/* 1. EXPLORAR (Arriba Mobile / Izquierda Desktop) */}
-                            <button onClick={handleGenerateAsset} className="glass-button w-full md:w-56 h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1">
-                                <div className="w-5 h-5 flex items-center justify-center">
-                                    <img src={isGenerating ? ICONS.loader : ICONS.search} className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} />
-                                </div>
-                                <div className="flex flex-col items-start gap-1">
-                                    <div className="opacity-60 text-white text-[10px] font-normal">NUEVO ACTIVO</div>
-                                    <div className="text-white text-sm font-normal">EXPLORAR ACTIVOS</div>
-                                </div>
-                            </button>
-
-                            {/* 2. ZOOM (Abajo Mobile (order-3) / Centro Desktop (order-2)) */}
-                            <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-2 order-3 md:order-2">
-                                <div className="w-full h-[2px] bg-[#333] rounded-full absolute top-1/2 transform -translate-y-1/2"></div>
-                                <div 
-                                    className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                                    style={{ left: `${sliderPercentage}%` }} 
-                                ></div>
-                                <input type="range" min="80" max="350" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="zoom-slider" />
-                            </div>
-
-                            {/* 3. OPERACIONES (Centro Mobile (order-2) / Derecha Desktop (order-3)) */}
-                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-3">
-                                <button onClick={() => executeTrade('BUY')} className="flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b]">
-                                    <img src={ICONS.trendingUp} className="w-5 h-5" />
-                                    <div className="flex flex-col items-start gap-1 text-black">
-                                        <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
-                                        <div className="text-sm font-medium">BUY / 10s.</div>
-                                    </div>
-                                </button>
-                                
-                                <button onClick={() => executeTrade('SELL')} className="flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573]">
-                                    <img src={ICONS.trendingDown} className="w-5 h-5" />
-                                    <div className="flex flex-col items-start gap-1 text-black">
-                                        <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
-                                        <div className="text-sm font-medium">SELL / 10s.</div>
-                                    </div>
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MarketSim />);
-    </script>
-</body>
-</html>
+            useEffect(() => {
+                let animationId;
+                let logicInterval;
+                const LOGIC_RATE_MS = 1000 / TICK_RATE;
+                logicInterval = setInterval(() => {
+                    const now = Date.now();
+                    if (!navigator.onLine) return;
+                    if (offlineStartRef.current !== 0) { offlineStartRef.current = 0; }
+                    if (!lastTimeRef.current) lastTimeRef.current = now;
+                    const deltaTime = now - lastTimeRef.current;
+                    let ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
+                    if (ticksToProcess > 0) {
+                        if (ticksToProcess > 2000) { ticksToProcess = 2000; lastTimeRef.current = now; } else { lastTimeRef.current += ticksToProcess * LOGIC_RATE_MS; }
+                        for (let i = 0; i < ticksToProcess; i++) {
+                            processMarketLogic();
+                            updateVisualCandleLogic();
+                            if (ticksToProcess < 50 || i % 10 === 0) {
+                                const ks = kinematicState.current;
+                                const state = marketState.current;
+                                const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
+                                const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
+                                if (isBuy || isSell) {
+                                    aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: 20, featuresSnapshot: { ...ks.currentFeatures } });
+                                }
+                                aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; });
+                            }
+                        }
+                    }
+                    const realNow = Date.now();
+                    const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
+                    if (expiredTrades.length > 0) {
+                        let totalPayout = 0;
+                        expiredTrades.forEach(trade => {
+                            const isWin = trade.type === 'BUY' ? marketState.current.visualValue > trade.entryPrice : marketState.current.visualValue < trade.entryPrice;
+                            if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
+                            if (isWin) { totalPayout += trade.amount * 1.85; addNotification({ profit: trade.amount * 0.85, type: 'WIN', tradeType: trade.type, entry: trade.entryPrice }); } else { addNotification({ profit: -trade.amount, type: 'LOSS', tradeType: trade.type, entry: trade.entryPrice }); }
+                        });
+                        activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
+                        setActiveTradesUI([...activeTradesRef.current]);
+                        if (totalPayout > 0) setBalance(b => b + totalPayout);
+                    }
+                }, 100);
+                const drawLoop = () => {
+                    const now = Date.now();
+                    if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
+                        setCurrentPriceUI(marketState.current.visualValue);
+                        lastUIUpdateRef.current = now;
+                    }
+                    const canvas = canvasRef.current;
+                    if (canvas) {
+                        const dpr = window.devicePixelRatio || 1;
+                        const ctx = canvas.getContext('2d');
+                        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                        const state = marketState.current;
+                        const width = canvas.width, height = canvas.height;
+                        const priceSmoothing = 0.3;
+                        state.visualValue += (state.currentValue - state.visualValue) * priceSmoothing;
+                        const horizontalSmoothing = 0.2;
+                        state.scrollOffset += (state.targetScroll - state.scrollOffset) * horizontalSmoothing;
+                        // --- CENTRAR LÍNEA DE PRECIO EN MOBILE ---
+                        if (isMobileRef.current) {
+                            // Centrar la línea de precio en el eje Y
+                            // Calcula el rango y padding como antes
+                            const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
+                            let allCandles = [...state.candles];
+                            allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
+                            let minPrice = Infinity, maxPrice = -Infinity;
+                            allCandles.forEach((c, i) => { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; });
+                            if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+                            const range = maxPrice - minPrice || 10;
+                            const padding = range * 0.45;
+                            const yMax = maxPrice + padding, yMin = minPrice - padding;
+                            // Calcula el desplazamiento para centrar la línea de precio
+                            const centerY = height / 2;
+                            const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+                            const currentY = getY(state.visualValue);
+                            // Ajusta yMin/yMax para que currentY esté centrado
+                            const priceRange = yMax - yMin;
+                            const priceToCenter = state.visualValue;
+                            // Calcula el nuevo yMin/yMax para centrar
+                            const newYMin = priceToCenter - ((height / 2) * (priceRange / height));
+                            const newYMax = priceToCenter + ((height / 2) * (priceRange / height));
+                            // Redefine getY para el resto del render
+                            const getYMobile = (price) => height - ((price - newYMin) / (newYMax - newYMin)) * height;
+                            // Renderiza usando getYMobile
+                            ctx.fillStyle = '#050505';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.strokeStyle = '#222';
+                            ctx.setLineDash([4, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(0, centerY);
+                            ctx.lineTo(width, centerY);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            // Renderiza velas y trades usando getYMobile
+                            const candleWidth = width / zoom;
+                            const anchorX = width * 0.82;
+                            const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
+                            const barWidth = Math.max(1, candleWidth * 0.8);
+                            allCandles.forEach((candle, i) => {
+                                const x = getX(i);
+                                if (x < -candleWidth || x > width + candleWidth) return;
+                                const yOpen = getYMobile(candle.open), yClose = getYMobile(candle.close), yHigh = getYMobile(candle.high), yLow = getYMobile(candle.low);
+                                ctx.strokeStyle = candle.color;
+                                ctx.lineWidth = Math.max(1, candleWidth * 0.1);
+                                ctx.beginPath();
+                                ctx.moveTo(x, yHigh);
+                                ctx.lineTo(x, yLow);
+                                ctx.stroke();
+                                const bodyHeight = Math.max(0.5, Math.abs(yClose - yOpen));
+                                ctx.fillStyle = candle.color;
+                                if (candle.isForming) { ctx.shadowBlur = 10; ctx.shadowColor = candle.color; }
+                                ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight);
+                                ctx.shadowBlur = 0;
+                            });
+                            activeTradesRef.current.forEach(trade => {
+                                const yEntry = getYMobile(trade.entryPrice);
+                                const xEntry = getX(trade.entryIndex);
+                                const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
+                                const futureIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle) + (remainingSeconds * TICK_RATE / state.ticksPerCandle);
+                                const xExpire = getX(futureIndex);
+                                const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
+                                ctx.strokeStyle = tradeColor;
+                                ctx.lineWidth = 1;
+                                ctx.globalAlpha = 0.5;
+                                ctx.beginPath();
+                                ctx.moveTo(xEntry, yEntry);
+                                ctx.lineTo(width, yEntry);
+                                ctx.stroke();
+                                ctx.setLineDash([4, 4]);
+                                ctx.beginPath();
+                                ctx.moveTo(xExpire, yEntry - 40);
+                                ctx.lineTo(xExpire, yEntry + 40);
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                                ctx.globalAlpha = 0.3;
+                                ctx.beginPath();
+                                ctx.moveTo(xEntry, yEntry);
+                                ctx.lineTo(xExpire, yEntry);
+                                ctx.stroke();
+                                ctx.globalAlpha = 1;
+                                ctx.fillStyle = tradeColor;
+                                ctx.beginPath();
+                                ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
+                                ctx.fill();
+                            });
+                            ctx.fillStyle = '#111';
+                            ctx.fillRect(width - 100, centerY - 10, 100, 20);
+                            ctx.fillStyle = '#fff';
+                            ctx.font = 'bold 12px monospace';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(state.visualValue.toFixed(2), width - 50, centerY + 5);
+                            // --- FIN MOBILE ---
+                        } else {
+                            const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
+                            let allCandles = [...state.candles];
+                            allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
+                            const candleWidth = width / zoom;
+                            const anchorX = width * 0.82;
+                            const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
+                            let minPrice = Infinity, maxPrice = -Infinity;
+                            allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
+                            if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+                            const range = maxPrice - minPrice || 10;
+                            const padding = range * 0.45;
+                            const yMax = maxPrice + padding, yMin = minPrice - padding;
+                            const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+                            const currentY = getY(state.visualValue);
+                            ctx.strokeStyle = '#222';
+                            ctx.setLineDash([4, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(0, currentY);
+                            ctx.lineTo(width, currentY);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            const barWidth = Math.max(1, candleWidth * 0.8);
+                            allCandles.forEach((candle, i) => {
+                                const x = getX(i);
+                                if (x < -candleWidth || x > width + candleWidth) return;
+                                const yOpen = getY(candle.open), yClose = getY(candle.close), yHigh = getY(candle.high), yLow = getY(candle.low);
+                                ctx.strokeStyle = candle.color;
+                                ctx.lineWidth = Math.max(1, candleWidth * 0.1);
+                                ctx.beginPath();
+                                ctx.moveTo(x, yHigh);
+                                ctx.lineTo(x, yLow);
+                                ctx.stroke();
+                                const bodyHeight = Math.max(0.5, Math.abs(yClose - yOpen));
+                                ctx.fillStyle = candle.color;
+                                if (candle.isForming) { ctx.shadowBlur = 10; ctx.shadowColor = candle.color; }
+                                ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight);
+                                ctx.shadowBlur = 0;
+                            });
+                            activeTradesRef.current.forEach(trade => {
+                                const yEntry = getY(trade.entryPrice);
+                                const xEntry = getX(trade.entryIndex);
+                                const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
+                                const futureIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle) + (remainingSeconds * TICK_RATE / state.ticksPerCandle);
+                                const xExpire = getX(futureIndex);
+                                const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
+                                ctx.strokeStyle = tradeColor;
+                                ctx.lineWidth = 1;
+                                ctx.globalAlpha = 0.5;
+                                ctx.beginPath();
+                                ctx.moveTo(xEntry, yEntry);
+                                ctx.lineTo(width, yEntry);
+                                ctx.stroke();
+                                ctx.setLineDash([4, 4]);
+                                ctx.beginPath();
+                                ctx.moveTo(xExpire, yEntry - 40);
+                                ctx.lineTo(xExpire, yEntry + 40);
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                                ctx.globalAlpha = 0.3;
+                                ctx.beginPath();
+                                ctx.moveTo(xEntry, yEntry);
+                                ctx.lineTo(xExpire, yEntry);
+                                ctx.stroke();
+                                ctx.globalAlpha = 1;
+                                ctx.fillStyle = tradeColor;
+                                ctx.beginPath();
+                                ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
+                                ctx.fill();
+                            });
+                            ctx.fillStyle = '#111';
+                            ctx.fillRect(width - 100, currentY - 10, 100, 20);
+                            ctx.fillStyle = '#fff';
+                            ctx.font = 'bold 12px monospace';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(state.visualValue.toFixed(2), width - 50, currentY + 5);
+                        }
+       

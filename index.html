@@ -116,7 +116,7 @@
             const materials = ["AX", "BR", "ORE", "CX", "PLATA", "F", "G", "X", "Y", "RB"];
             const adjectives = ["45", "19", "91", "10", "11", "05", "PRO", "16", "55"];
             const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
-            const DURATIONS = [5000, 10000, 15000, 30000]; // Duraciones posibles
+            const DURATIONS = [5000, 10000, 15000, 30000];
 
             const [zoom, setZoom] = useState(INITIAL_ZOOM); 
             const [balance, setBalance] = useState(100000); 
@@ -125,7 +125,7 @@
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
             const [isGenerating, setIsGenerating] = useState(false); 
             const [assetName, setAssetName] = useState("—"); 
-            const [currentDuration, setCurrentDuration] = useState(10); // Nuevo estado para UI
+            const [currentDuration, setCurrentDuration] = useState(10); 
             const [isOnline, setIsOnline] = useState(navigator.onLine); 
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
@@ -133,12 +133,34 @@
             const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastTimeRef = useRef(0); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
             const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
             
+            // Nueva Ref para etiquetas temporales (Popups en el gráfico)
+            const resultLabelsRef = useRef([]);
+
             const sigmoid = (x) => 1 / (1 + Math.exp(-x));
             const trainAI = (features, actualOutcome) => { const brain = aiBrain.current; const rawSum = (features.vel * brain.weights.velocity) + (features.acc * brain.weights.acceleration) + (features.z * brain.weights.zScore) + brain.weights.bias; const predictedConfidence = sigmoid(rawSum); const error = actualOutcome - predictedConfidence; brain.weights.velocity += brain.learningRate * error * features.vel; brain.weights.acceleration += brain.learningRate * error * features.acc; brain.weights.zScore += brain.learningRate * error * features.z; brain.weights.bias += brain.learningRate * error; setAiLearnedCount(c => c + 1); };
             
-            const addNotification = useCallback((data) => { if (data.type === 'SIGNAL' && isNotificationVisible.current) return; const id = Date.now() + Math.random(); const duration = data.type === 'OFFLINE' ? 0 : 4000; setNotifications(prev => { if (data.type === 'WIN' || data.type === 'LOSS') return [{ ...data, id }]; if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; return prev; }); if (data.type !== 'OFFLINE') { isNotificationVisible.current = true; setTimeout(() => { setNotifications(prev => prev.filter(n => n.id !== id)); if (notifications.length <= 1) isNotificationVisible.current = false; }, duration); } else { isNotificationVisible.current = true; } }, []);
+            const addNotification = useCallback((data) => { 
+                if (data.type === 'SIGNAL' && isNotificationVisible.current) return; 
+                // FILTRO: Ya no mostramos WIN/LOSS en notificaciones, solo señales o sistema
+                if (data.type === 'WIN' || data.type === 'LOSS') return;
+
+                const id = Date.now() + Math.random(); 
+                const duration = data.type === 'OFFLINE' ? 0 : 4000; 
+                setNotifications(prev => { 
+                    if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; 
+                    return prev; 
+                }); 
+                if (data.type !== 'OFFLINE') { 
+                    isNotificationVisible.current = true; 
+                    setTimeout(() => { 
+                        setNotifications(prev => prev.filter(n => n.id !== id)); 
+                        if (notifications.length <= 1) isNotificationVisible.current = false; 
+                    }, duration); 
+                } else { 
+                    isNotificationVisible.current = true; 
+                } 
+            }, []);
             
-            // verticalShift y currentAnchor añadidos al estado
             const marketState = useRef({ visualTicks: [], candles: [], longTermTicks: [], currentValue: 15868, visualValue: 15868, lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, currentAnchor: 0.75, tradeDuration: 10000 });
             const tickHistory = useRef([]); const kinematicState = useRef({ lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 });
             
@@ -152,10 +174,8 @@
             const generateNewAsset = useCallback(() => { 
                 const rand = Math.pow(Math.random(), 2.5); 
                 const newBasePrice = 1000 + (1 - rand) * 99000; 
-                
-                // Duración Aleatoria
                 const randomDuration = DURATIONS[Math.floor(Math.random() * DURATIONS.length)];
-                setCurrentDuration(randomDuration / 1000); // Actualizar UI
+                setCurrentDuration(randomDuration / 1000); 
 
                 setAssetName(`${materials[Math.floor(Math.random() * materials.length)]} ${adjectives[Math.floor(Math.random() * adjectives.length)]}`); 
                 tickHistory.current = []; 
@@ -173,8 +193,8 @@
                     targetScroll: 0, 
                     scrollOffset: 0, 
                     verticalShift: 0, 
-                    currentAnchor: 0.75, // Reset de ancla
-                    tradeDuration: randomDuration // Guardar duración
+                    currentAnchor: 0.75, 
+                    tradeDuration: randomDuration 
                 }; 
                 warmUpMarket(15); 
             }, []);
@@ -184,12 +204,12 @@
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
+                if (activeTradesRef.current.length >= 4) return; // LÍMITE DE 4 TRADES
+                
                 const state = marketState.current; 
                 const ks = kinematicState.current; 
                 const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
                 const now = Date.now(); 
-                
-                // Usar la duración dinámica del activo
                 const duration = state.tradeDuration || 10000;
                 
                 const newTrade = { 
@@ -201,7 +221,7 @@
                     expiryTime: now + duration, 
                     amount: INVESTMENT_AMOUNT, 
                     aiSnapshot: { ...ks.currentFeatures },
-                    duration: duration // Guardamos duración para la cámara
+                    duration: duration 
                 }; 
                 activeTradesRef.current.push(newTrade); 
                 setActiveTradesUI([...activeTradesRef.current]); 
@@ -240,10 +260,25 @@
                     const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
                     if (expiredTrades.length > 0) {
                         let totalPayout = 0;
+                        const state = marketState.current;
                         expiredTrades.forEach(trade => {
-                            const isWin = trade.type === 'BUY' ? marketState.current.visualValue > trade.entryPrice : marketState.current.visualValue < trade.entryPrice;
+                            const isWin = trade.type === 'BUY' ? state.visualValue > trade.entryPrice : state.visualValue < trade.entryPrice;
                             if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
-                            if (isWin) { totalPayout += trade.amount * 1.85; addNotification({ profit: trade.amount * 0.85, type: 'WIN', tradeType: trade.type, entry: trade.entryPrice }); } else { addNotification({ profit: -trade.amount, type: 'LOSS', tradeType: trade.type, entry: trade.entryPrice }); }
+                            
+                            // AÑADIR ETIQUETA FLOTANTE DE RESULTADO
+                            const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
+                            resultLabelsRef.current.push({
+                                id: Date.now() + Math.random(),
+                                xIndex: currentPreciseIndex,
+                                price: state.visualValue,
+                                profit: isWin ? trade.amount * 0.85 : -trade.amount,
+                                timestamp: Date.now(),
+                                type: isWin ? 'WIN' : 'LOSS'
+                            });
+
+                            if (isWin) { 
+                                totalPayout += trade.amount * 1.85; 
+                            }
                         });
                         activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
                         setActiveTradesUI([...activeTradesRef.current]);
@@ -275,19 +310,16 @@
                         allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
                         const candleWidth = width / zoom;
                         
-                        // === CÁMARA HORIZONTAL DINÁMICA ===
                         let targetAnchorPercent = 0.75;
                         const activeTrades = activeTradesRef.current;
                         if (activeTrades.length > 0) {
                             const maxDuration = Math.max(...activeTrades.map(t => t.duration));
-                            // Si es largo plazo (>=30s), mover al centro. Si es medio (>=15s), al 60%.
                             if (maxDuration >= 30000) targetAnchorPercent = 0.50;
                             else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
                         }
                         if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
                         state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * 0.05;
                         const anchorX = width * state.currentAnchor;
-                        // ==================================
 
                         const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
                         let minPrice = Infinity, maxPrice = -Infinity;
@@ -321,6 +353,31 @@
                         ctx.lineTo(width, currentY);
                         ctx.stroke();
                         ctx.setLineDash([]);
+                        
+                        // LÍNEA DE PREVISUALIZACIÓN DE DURACIÓN
+                        const previewDuration = state.tradeDuration || 10000;
+                        const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
+                        const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
+                        const xFuture = getX(futureIndex);
+                        const xCurrent = getX(currentPreciseIndex);
+                        
+                        // Si hay trades activos, la línea es gris suave, si no, es blanca tenue
+                        ctx.strokeStyle = activeTradesRef.current.length > 0 ? '#333' : '#666'; 
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([2, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(xCurrent, currentY);
+                        ctx.lineTo(xFuture, currentY);
+                        ctx.stroke();
+                        
+                        // Línea vertical final de previsualización
+                        ctx.beginPath();
+                        ctx.moveTo(xFuture, currentY - 20);
+                        ctx.lineTo(xFuture, currentY + 20);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+
                         const barWidth = Math.max(1, candleWidth * 0.8);
                         allCandles.forEach((candle, i) => {
                             const x = getX(i);
@@ -338,6 +395,7 @@
                             ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight);
                             ctx.shadowBlur = 0;
                         });
+
                         activeTradesRef.current.forEach(trade => {
                             const yEntry = getY(trade.entryPrice);
                             const xEntry = getX(trade.entryIndex);
@@ -369,6 +427,42 @@
                             ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
                             ctx.fill();
                         });
+
+                        // DIBUJAR ETIQUETAS DE RESULTADO ANIMADAS
+                        resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); // 2 segundos de vida
+                        resultLabelsRef.current.forEach(label => {
+                            const age = Date.now() - label.timestamp;
+                            const progress = age / 2000;
+                            const yPos = getY(label.price) - 30 - (progress * 50); // Sube 50px
+                            const xPos = getX(label.xIndex);
+                            const opacity = 1 - Math.pow(progress, 3); // Fade out suave
+
+                            ctx.globalAlpha = opacity;
+                            const bg = label.type === 'WIN' ? '#10B981' : '#F43F5E';
+                            
+                            // Replicar diseño de Figma
+                            ctx.fillStyle = bg;
+                            ctx.shadowBlur = 20;
+                            ctx.shadowColor = 'rgba(244, 63, 94, 0.20)'; // Sombra roja sutil como en diseño
+                            
+                            // Rectángulo redondeado
+                            const labelW = 100;
+                            const labelH = 40;
+                            ctx.beginPath();
+                            ctx.roundRect(xPos - labelW/2, yPos - labelH/2, labelW, labelH, 20);
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+
+                            // Texto
+                            ctx.fillStyle = '#000000'; // Texto negro
+                            ctx.font = '500 14px "BDO Grotesk", sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            const prefix = label.profit > 0 ? '+' : '';
+                            ctx.fillText(`${prefix} $${Math.abs(label.profit).toFixed(0)}`, xPos, yPos);
+                        });
+                        ctx.globalAlpha = 1;
+
 
                         const isSmallScreen = width < 768;
                         const labelX = isSmallScreen ? 0 : width - 100;
@@ -447,18 +541,16 @@
 
                         {notifications.map(note => {
                             let iconSrc = ICONS.activityNeutral;
-                            if(note.type === 'WIN') iconSrc = ICONS.activityWin;
-                            if(note.type === 'LOSS') iconSrc = ICONS.activityLoss;
                             if(note.type === 'SIGNAL') iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
                             return (
                                 <div key={note.id} className="glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90">
                                     <img src={iconSrc} className="w-5 h-5" />
                                     <div className="flex flex-col justify-center items-start gap-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                            {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'OPERACIÓN TERMINADA'}
+                                            {note.type === 'SIGNAL' ? `SEÑAL ${note.signalType}` : 'NOTIFICACIÓN'}
                                         </div>
                                         <div className="text-sm font-medium">
-                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : `${note.profit > 0 ? 'GANANCIA' : 'PÉRDIDA'} ${note.profit.toFixed(2)}`}
+                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
                                         </div>
                                     </div>
                                 </div>

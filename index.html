@@ -116,10 +116,10 @@
 
             const materials = ["AX", "BR", "ORE", "CX", "PLATA", "F", "G", "X", "Y", "RB"];
             const adjectives = ["45", "19", "91", "10", "11", "05", "PRO", "16", "55"];
-            const TICK_RATE = 2; const TRADE_DURATION_MS = 10000; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
+            const TICK_RATE = 2; const TRADE_DURATION_MS = 10000; const INVESTMENT_AMOUNT = 500; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 80;
             
             const [zoom, setZoom] = useState(INITIAL_ZOOM); 
-            const [balance, setBalance] = useState(100000); 
+            const [balance, setBalance] = useState(10000); 
             const [activeTradesUI, setActiveTradesUI] = useState([]); 
             const [notifications, setNotifications] = useState([]); 
             const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 

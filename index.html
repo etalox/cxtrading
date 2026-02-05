@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Quantum Market Simulator - Final Adjusted</title>
+    <title>CX Trade - Modern Trading </title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -29,20 +29,6 @@
         .zoom-slider { -webkit-appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
     </style>
-                if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; } 
-                const range = maxPrice - minPrice || 10; 
-                const padding = range * 0.45; 
-                let yMax = maxPrice + padding, yMin = minPrice - padding; 
-                if (isMobileRef.current) { 
-                    const r = yMax - yMin || 10; 
-                    const tempGetY = (price) => height - ((price - yMin) / r) * height; 
-                    const curY = tempGetY(state.visualValue); 
-                    const shiftPx = (height / 2) - curY; 
-                    const pricePerPx = r / height; 
-                    const priceShift = shiftPx * pricePerPx; 
-                    yMin -= priceShift; 
-                    yMax -= priceShift; 
-                } 
 <body>
     <div id="root"></div>
 

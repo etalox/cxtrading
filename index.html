@@ -767,11 +767,11 @@
                             const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
                             const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
                             const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                            const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
+                            const iconStyle = isBuy ? {} : { transform: 'scaleYgit (-1)' };
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[40px] flex items-center justify-center`}>
+                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[20px] flex items-center justify-center`}>
                                         <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
                                     </div>
                                     <div className="flex flex-col justify-center items-start gap-1.5">

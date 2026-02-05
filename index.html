@@ -26,7 +26,8 @@
         .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 40px; transition: all 0.2s ease; }
         .glass-button:active { transform: scale(0.96); }
         
-        .tab-item { transition: all 0.2s ease; cursor: pointer; }
+        /* Tabs Flotantes: Sin borde, redondeo alto */
+        .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 40px; }
         .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
         .toggle-switch { position: relative; width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; transition: background 0.3s; }
@@ -55,9 +56,8 @@
             activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
         };
 
-        const MATERIALS = ["PLATA", "BRONZE", "IRON", "LITIO", "ORE", "RODIO", "IRIDIO", "GX", "XY", "RED", "GOLD", "X"];
-        // Adjetivos ordenados para índices:
-        const ADJECTIVES = ["AIR", "01", "02", "05", "10", "15", "20", "25", "30", "45", "50", "80", "90", "100", "PLUS", "ALPHA", "BETA", "GAMMA", "DELTA", "OMEGA"];
+        const MATERIALS = ["PLATA", "BRONCE", "HIERRO", "COBRE", "LITIO", "ORO", "RODIO", "IRIDIO", "PLASMA", "AX-99"];
+        const ADJECTIVES = ["01", "02", "05", "10", "15", "RAW", "20", "25", "30", "45", "STD", "50", "80", "90", "PRO", "PRIME", "MAX"];
 
         const MarketSim = () => {
             const isMobile = window.innerWidth < 768;
@@ -71,7 +71,6 @@
                 { name: "INIT 03", price: 1000, change: 0 }
             ]);
             
-            // 1. PERSISTENCIA DE BALANCE
             const [balance, setBalance] = useState(() => {
                 try {
                     const saved = localStorage.getItem('cx_balance');
@@ -80,7 +79,6 @@
             });
             useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
 
-            // HISTORIAL DE ACTIVOS VISTOS { name: string, timestamp: number }
             const assetHistoryRef = useRef([]);
 
             const createEmptyState = () => ({
@@ -90,8 +88,8 @@
                 currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
                 ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
                 currentAnchor: 0.75, tradeDuration: 10000,
-                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false }, // Nuevo flag
-                stepBuffer: 0, // Para movimiento escalonado
+                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
+                stepBuffer: 0,
                 initialized: false
             });
 
@@ -177,21 +175,34 @@
             }, []);
             
             const generateDNAFromName = (materialIdx, adjectiveIdx) => {
-                const normalizedMat = materialIdx / (MATERIALS.length - 1); 
-                const volatility = 0.5 + (normalizedMat * 1.5);
-                const aggression = 0.1 + (normalizedMat * 0.7);
-                const normalizedAdj = adjectiveIdx / (ADJECTIVES.length - 1);
-                const structure = 0.2 + Math.pow(normalizedAdj, 2) * 0.75; 
+                // CENTRADO DE VALORES (Logica re-ajustada)
+                // Ahora los indices centrales (ej. ORO, RODIO / STD, 50) generan los valores "base" (DNA 1.0)
+                // Los extremos generan valores más bajos o más altos.
+                
+                // Material Normalizado: 0 (Plata) -> 1 (AX-99). Centro ~0.5 (Litio/Oro)
+                const normMat = materialIdx / (MATERIALS.length - 1);
+                
+                // Adjetivo Normalizado: 0 (01) -> 1 (MAX). Centro ~0.5 (30/45)
+                const normAdj = adjectiveIdx / (ADJECTIVES.length - 1);
+
+                // Volatilidad: 
+                // Queremos que el centro sea ~1.0 (equilibrado)
+                // Extremos: Izquierda (0.0) -> muy baja vol. Derecha (1.0) -> muy alta vol.
+                // Ajustamos la formula para que sea lineal pero centrada en la experiencia "default".
+                const volatility = 0.5 + (normMat * 1.5); // 0.5 a 2.0 (Igual que antes, la distribucion de prob. se encarga de que salga mas el centro)
+
+                // Estructura:
+                // Igual, la prob de seleccion favorece el centro.
+                const structure = 0.2 + Math.pow(normAdj, 2) * 0.75; 
+
                 const seed = (materialIdx * 100) + adjectiveIdx;
                 const pseudoRand = Math.sin(seed) * 0.5 + 0.5; 
                 const trendBias = (pseudoRand - 0.5) * 0.3; 
                 
-                // 4. DETECCIÓN DE ESCALONADO (Múltiplos de 10)
-                // Checamos si el index en ADJECTIVES es múltiplo de 3 (para simular el "10" de un conjunto grande)
-                // O si el nombre del adjetivo contiene "0" al final. Simplificación: Usamos modulo 3 del index.
+                // Stepped motion para múltiplos de 10 (aprox cada 3 items en la lista adjetivos)
                 const isStepped = (adjectiveIdx % 3 === 0);
 
-                return { volatility, aggression, structure, trendBias, isStepped };
+                return { volatility, aggression: 0.1 + (normMat * 0.7), structure, trendBias, isStepped };
             };
 
             const updatePredictor = (newPrice) => { 
@@ -230,7 +241,6 @@
                         addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
                         state.lastSignalTick = state.currentValue;
                         
-                        // 2. AUTOPILOT: SOLO 1 TRADE SIMULTÁNEO
                         if (autopilot && confidence > 0.6 && activeTradesRef.current.length === 0) {
                             const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
                             if (lastSignalRef.current !== currentSignal) { 
@@ -285,20 +295,13 @@
                 const baseVol = state.currentValue * 0.0006; 
                 const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
                 
-                // 4. LÓGICA DE MOVIMIENTO ESCALONADO (STEPPED)
                 if (dna.isStepped && state.patternState !== 'MOMENTUM') {
-                    // Acumulamos el movimiento en un buffer
                     state.stepBuffer = (state.stepBuffer || 0) + movement;
-                    
-                    // Solo aplicamos el cambio cada 8 ticks (aprox 4 segundos)
-                    // Usamos ticksSincePatternChange como contador cíclico simple
                     if (state.ticksSincePatternChange % 8 === 0) {
                         state.currentValue += state.stepBuffer;
-                        state.stepBuffer = 0; // Reset buffer
+                        state.stepBuffer = 0; 
                     }
-                    // Si no toca cambio, el precio se mantiene plano (meseta)
                 } else {
-                    // Movimiento fluido normal
                     state.currentValue += movement; 
                 }
                 
@@ -331,33 +334,33 @@
             
             const generateAssetForTab = useCallback((tabIndex) => {
                 const now = Date.now();
-                // Limpiar historial antiguo (> 5 mins)
                 assetHistoryRef.current = assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
 
                 let attempts = 0;
                 let selectedName = "";
                 let matIdx, adjIdx;
                 
-                // 7. BUCLE DE BÚSQUEDA HASTA ENCONTRAR DISPONIBLE
                 const findAvailableAsset = () => {
                     while (attempts < 100) {
                         attempts++;
-                        const mIdx = Math.floor(Math.random() * MATERIALS.length);
-                        const aIdxRaw = Math.floor(Math.pow(Math.random(), 1.5) * ADJECTIVES.length);
-                        const aIdx = Math.min(aIdxRaw, ADJECTIVES.length - 1);
+                        
+                        // 2. DISTRIBUCIÓN "CENTRADA" (Campana de Gauss simulada)
+                        // Promediamos 2 randoms para que el resultado tienda al centro (0.5)
+                        const matRand = (Math.random() + Math.random()) / 2;
+                        const adjRand = (Math.random() + Math.random()) / 2;
+
+                        const mIdx = Math.floor(matRand * MATERIALS.length);
+                        const aIdx = Math.floor(adjRand * ADJECTIVES.length);
+
                         const fullName = `${MATERIALS[mIdx]} ${ADJECTIVES[aIdx]}`;
                         
-                        // 5. NO REPETIR EN TABS ACTUALES
                         const isCurrentlyActive = assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
-                        
-                        // 6. NO REPETIR HISTORIAL RECIENTE
                         const inHistory = assetHistoryRef.current.some(a => a.name === fullName);
 
                         if (!isCurrentlyActive && !inHistory) {
                             selectedName = fullName;
                             matIdx = mIdx;
                             adjIdx = aIdx;
-                            // Agregar a historial
                             assetHistoryRef.current.push({ name: fullName, timestamp: now });
                             return true;
                         }
@@ -366,12 +369,10 @@
                 };
 
                 if (!findAvailableAsset()) {
-                    // Si falla después de 100 intentos, reintentamos con un timeout (simulando espera)
                     setTimeout(() => generateAssetForTab(tabIndex), 500);
-                    return; // Mantenemos estado de 'loading'
+                    return; 
                 }
 
-                // SI ENCONTRAMOS ACTIVO, PROCEDEMOS
                 const rand = Math.pow(Math.random(), 2.5); 
                 const newBasePrice = 1000 + (1 - rand) * 99000; 
                 const dna = generateDNAFromName(matIdx, adjIdx);
@@ -388,15 +389,13 @@
                 setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
                 if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }
                 
-                // Finalizamos carga
                 setIsGenerating(false);
 
-            }, [activeTab, assetsInfo]); // Dependencia assetsInfo para chequear duplicados actuales
+            }, [activeTab, assetsInfo]);
 
             useEffect(() => {
                 if (!marketStatesRef.current[0].initialized) { 
                     setIsGenerating(true);
-                    // Inicialización secuencial pequeña para evitar bloqueo
                     setTimeout(() => generateAssetForTab(0), 10);
                     setTimeout(() => generateAssetForTab(1), 50);
                     setTimeout(() => generateAssetForTab(2), 100);
@@ -413,13 +412,11 @@
             const handleGenerateAsset = () => { 
                 if (isGenerating) return; 
                 setIsGenerating(true); 
-                // Delay artificial para UX
                 setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
             
             const executeTrade = (type) => { 
                 if (!isOnline) return; 
-                // 2. RESTRICCIÓN AUTOPILOT: Si activo, max 1 trade global. Si no, max 4.
                 const maxTrades = autopilot ? 1 : 4;
                 if (activeTradesRef.current.length >= maxTrades) return;
                 
@@ -743,6 +740,7 @@
                             <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
                         </div>
 
+                        {/* --- 4. TABS FLOTANTES (Sin bordes, redondeo alto) --- */}
                         <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
                             {assetsInfo.map((info, idx) => {
                                 const isActive = activeTab === idx;
@@ -751,8 +749,8 @@
                                         key={idx}
                                         onClick={() => handleTabChange(idx)}
                                         className={`
-                                            tab-item h-[60px] px-10 rounded-2xl flex items-center justify-center gap-[10px]
-                                            ${isActive ? 'border border-white' : 'border border-white/40'}
+                                            tab-item h-[60px] px-10 flex items-center justify-center gap-[10px]
+                                            /* Sin bordes (border/outline removidos) */
                                             overflow-hidden
                                         `}
                                     >
@@ -860,7 +858,7 @@
                             <button 
                                 onClick={handleGenerateAsset} 
                                 disabled={isGenerating}
-                                className={`glass-button w-full md:w-[280px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                                className={`glass-button w-full md:w-[280px] h-16 flex items-center justify-center gap-2 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
                             >
                                 <div className="w-5 h-5 flex items-center justify-center">
                                     <img 
@@ -878,14 +876,17 @@
                                 </div>
                             </button>
 
-                            {/* 3. AUTOPILOT (Renombrado y actualizado) */}
+                            {/* 1. AUTOPYLOT: Movido al final (order-4) y sin fondo (sin glass-button) */}
                             {!isMobile && (
-                                <div className="glass-button h-16 px-6 flex items-center gap-4 order-2 cursor-pointer" onClick={() => setAutopilot(!autopilot)}>
+                                <div 
+                                    className="h-16 px-6 flex items-center gap-4 order-2 md:order-4 cursor-pointer hover:opacity-80 transition-opacity" 
+                                    onClick={() => setAutopilot(!autopilot)}
+                                >
                                     <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
                                         <div className="toggle-knob"></div>
                                     </div>
                                     <div className="flex flex-col items-start gap-1">
-                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
+                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPYLOT</div>
                                         <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
                                     </div>
                                 </div>
@@ -900,11 +901,11 @@
                                 <input type="range" min="80" max="350" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="zoom-slider" />
                             </div>
 
-                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-4">
+                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-2">
                                 <button 
                                     onClick={() => executeTrade('BUY')} 
                                     disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[40px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <img src={ICONS.trendingUp} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">
@@ -916,7 +917,7 @@
                                 <button 
                                     onClick={() => executeTrade('SELL')} 
                                     disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[40px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-2 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <img src={ICONS.trendingDown} className="w-5 h-5" />
                                     <div className="flex flex-col items-start gap-1 text-black">

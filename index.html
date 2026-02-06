@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CX Trade - Modern Trading </title>
-    
+
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -26,7 +26,7 @@
     .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 30px; }
     .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 20px; transition: all 0.2s ease; }
     .glass-button:active { transform: scale(0.96); }
-    
+
     .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 16px; }
     .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
@@ -35,1042 +35,594 @@
         position: relative; 
         width: 44px; 
         height: 24px; 
-        background: rgba(255,255,255,0.2); 
+        background: rgba(255, 255, 255, 0.1); 
         border-radius: 12px; 
         cursor: pointer; 
-        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+        transition: background 0.2s ease;
+        flex-shrink: 0;
     }
-
-    /* Hover solo cuando está APAGADO */
-    .toggle-switch:not(.active):hover {
-        background: rgba(255,255,255,0.3);
-    }
-
-    /* ESTADO ACTIVO (ENCENDIDO) */
-    .toggle-switch.active { 
-        background: #ffffff; 
-        /* Animación de pulso eléctrico */
-        animation: glow-pulse 4s infinite ease-in-out;
-    }
-
-    /* LA BOLITA (KNOB) */
+    .toggle-switch.active { background: rgba(16, 185, 129, 0.3); }
     .toggle-knob { 
         position: absolute; 
         top: 2px; 
         left: 2px; 
         width: 20px; 
         height: 20px; 
-        background: #ffffff; 
+        background: rgba(255, 255, 255, 0.3); 
         border-radius: 50%; 
-        transition: transform 0.3s, background 0.3s; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        transition: all 0.2s ease;
     }
-
-    /* Movimiento y cambio de color del Knob al activar */
     .toggle-switch.active .toggle-knob { 
-        transform: translateX(20px); 
-        background: #000000; 
+        left: 22px; 
+        background: rgba(16, 185, 129, 0.8); 
     }
 
-    /* --- KEYFRAMES --- */
-    
-    /* Animación del Switch */
-    @keyframes glow-pulse {
-        0% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
-        50% { box-shadow: 0 0 48px rgba(255, 255, 255, 0.4), 0 0 24px rgba(255,255,255,0.8); } 
-        100% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+    /* --- SLIDER ZOOM --- */
+    .zoom-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 2px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        outline: none;
+    }
+    .zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+    }
+    .zoom-slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        border: none;
     }
 
-    /* Animaciones Generales */
+    /* --- ANIMACIONES --- */
     @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+    .animate-fade-in { animation: fade-in 0.3s ease forwards; }
 
-    @keyframes blink-fast {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+    /* --- RESPONSIVE --- */
+    @media (max-width: 768px) {
+        .glass-panel { border-radius: 20px; }
     }
-    .animate-blink { animation: blink-fast 1s infinite; }
 
-    /* --- CONTROLES EXTRA --- */
-    .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
-    .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
-    .cursor-wait { cursor: wait; }
-</style>
+    /* Hack para activar aceleración por hardware */
+    canvas { transform: translateZ(0); will-change: transform; }
+    </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
+        /* ========== ICONOS (DATA URLS) ========== */
         const ICONS = {
-            search: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/search.png',
-            loader: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loader.png',
-            trendingUp: './svg/up.svg',
-            trendingDown: './svg/up.svg',
-            wifiOff: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/wifiOff.png',
-            activityWin: './svg/up.svg',
-            activityLoss: './svg/up.svg',
-            activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
+            plus: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 4v16m8-8H4'/%3E%3C/svg%3E",
+            minus: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M20 12H4'/%3E%3C/svg%3E",
+            trendingUp: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'/%3E%3C/svg%3E",
+            trendingDown: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'/%3E%3C/svg%3E",
+            chevronDown: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E",
+            zap: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E",
+            activity: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E",
+            globe: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E"
         };
 
-        const MATERIALS = ["PLATA", "BRONCE", "HIERRO", "COBRE", "LITIO", "ORO", "RODIO", "IRIDIO", "PLASMA", "AX-99"];
-        const ADJECTIVES = ["01", "02", "05", "10", "15", "RAW", "20", "25", "30", "45", "STD", "50", "80", "90", "PRO", "PRIME", "MAX"];
+        const assetsInfo = [
+            { id: 'BTCUSD', name: 'BTC/USD', color: '#F7931A', initialPrice: 42000 },
+            { id: 'ETHUSD', name: 'ETH/USD', color: '#627EEA', initialPrice: 2200 },
+            { id: 'SOLUSD', name: 'SOL/USD', color: '#9945FF', initialPrice: 98 },
+            { id: 'XRPUSD', name: 'XRP/USD', color: '#00AAE4', initialPrice: 0.52 },
+            { id: 'ADAUSD', name: 'ADA/USD', color: '#0033AD', initialPrice: 0.38 },
+            { id: 'DOGUSD', name: 'DOG/USD', color: '#C3A634', initialPrice: 0.08 }
+        ];
 
+        /* ============================= */
+        /*       COMPONENTE PRINCIPAL     */
+        /* ============================= */
         const MarketSim = () => {
-            const isMobile = window.innerWidth < 768;
-            const INITIAL_ZOOM = isMobile ? 160 : 320;
-            const isMobileRef = useRef(isMobile);
-            
-            const [activeTab, setActiveTab] = useState(0); 
-            const [assetsInfo, setAssetsInfo] = useState([
-                { name: "INIT 01", price: 1000, change: 0 },
-                { name: "INIT 02", price: 1000, change: 0 },
-                { name: "INIT 03", price: 1000, change: 0 }
-            ]);
-            
-            const [balance, setBalance] = useState(() => {
-                try {
-                    const saved = localStorage.getItem('cx_balance');
-                    return saved ? parseFloat(saved) : 100000;
-                } catch (e) { return 100000; }
-            });
-            useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
-
-            const assetHistoryRef = useRef([]);
-
-            const createEmptyState = () => ({
-                visualTicks: [], candles: [], longTermTicks: [], currentValue: 1000, visualValue: 1000, 
-                lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, 
-                structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, 
-                currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
-                ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
-                currentAnchor: 0.75, tradeDuration: 10000,
-                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
-                stepBuffer: 0,
-                initialized: false,
-                visualMinPrice: undefined, visualMaxPrice: undefined // Para el suavizado vertical
-            });
-
-            const marketStatesRef = useRef([createEmptyState(), createEmptyState(), createEmptyState()]);
-            const tickHistoriesRef = useRef([[], [], []]);
-            const kinematicsRef = useRef([
-                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
-                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
-                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
-            ]);
-
-            const lastLogicTimeRef = useRef(Date.now());
-            const isTabVisibleRef = useRef(true);
-            const isCatchingUpRef = useRef(false);
-            const pendingTicksRef = useRef(0);
-
-            useEffect(() => {
-                const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
-                updateMobile();
-                window.addEventListener('resize', updateMobile);
-                
-                // Visibility Handler
-                const handleVisibilityChange = () => {
-                    if (document.hidden) {
-                        isTabVisibleRef.current = false;
-                    } else {
-                        isTabVisibleRef.current = true;
-                        // Al volver, no actualizamos lastLogicTimeRef inmediatamente para forzar el cálculo de delta
-                    }
-                };
-                document.addEventListener('visibilitychange', handleVisibilityChange);
-
-                const container = containerRef.current;
-                if (!container) return; 
-                
-                const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
-                const onWheel = (e) => {
-                    if (isInteractive(e.target)) return;
-                    e.preventDefault();
-                    isUserInteractingRef.current = true;
-                    const delta = -e.deltaY;
-                    const factor = delta > 0 ? 0.94 : 1.06;
-                    const newTarget = Math.max(80, Math.min(500, zoomTargetRef.current * factor));
-                    zoomTargetRef.current = newTarget;
-                    setZoom(newTarget);
-                };
-                let touchActive = false;
-                const onTouchStart = (e) => {
-                    if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
-                };
-                const onTouchMove = (e) => {
-                    if (!touchActive) return;
-                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
-                        if (isInteractive(lastTouchTargetRef.current)) return;
-                        e.preventDefault();
-                        const dx = e.touches[0].clientX - e.touches[1].clientX;
-                        const dy = e.touches[0].clientY - e.touches[1].clientY;
-                        const dist = Math.hypot(dx, dy);
-                        const ratio = (pinchStartRef.current || dist) / dist;
-                        pinchStartRef.current = dist;
-                        isUserInteractingRef.current = true;
-                        const newTarget = Math.max(80, Math.min(500, Math.round(zoomTargetRef.current * ratio)));
-                        zoomTargetRef.current = newTarget;
-                        setZoom(newTarget);
-                    }
-                };
-                const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
-                container.addEventListener('wheel', onWheel, { passive: false });
-                container.addEventListener('touchstart', onTouchStart, { passive: false });
-                container.addEventListener('touchmove', onTouchMove, { passive: false });
-                container.addEventListener('touchend', onTouchEnd);
-                return () => { 
-                    window.removeEventListener('resize', updateMobile); 
-                    document.removeEventListener('visibilitychange', handleVisibilityChange);
-                    container.removeEventListener('wheel', onWheel); 
-                    container.removeEventListener('touchstart', onTouchStart); 
-                    container.removeEventListener('touchmove', onTouchMove); 
-                    container.removeEventListener('touchend', onTouchEnd); 
-                };
-            }, []);
-
-            const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
-            const DURATIONS = [5000, 10000, 15000, 30000];
-
-            const [zoom, setZoom] = useState(INITIAL_ZOOM);
-            const zoomTargetRef = useRef(INITIAL_ZOOM);
-            const zoomCurrentRef = useRef(INITIAL_ZOOM);
-            const preTradeZoomRef = useRef(null);
-            const isUserInteractingRef = useRef(false);
- 
-            const [activeTradesUI, setActiveTradesUI] = useState([]); 
-            const [notifications, setNotifications] = useState([]); 
-            const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
-            const [isGenerating, setIsGenerating] = useState(false); 
-            const [currentDuration, setCurrentDuration] = useState(10); 
-            const [isOnline, setIsOnline] = useState(navigator.onLine); 
-            const [aiConfidence, setAiConfidence] = useState(0); 
-            const [aiLearnedCount, setAiLearnedCount] = useState(0);
+            const [activeTab, setActiveTab] = useState(0);
+            const [zoom, setZoom] = useState(80);
+            const [priceData, setPriceData] = useState(assetsInfo.map(a => ({ price: a.initialPrice, history: [] })));
             const [autopilot, setAutopilot] = useState(false);
+            const [balance, setBalance] = useState(10000);
+            const [totalInvested, setTotalInvested] = useState(0);
+            const [durations] = useState([10, 30, 60, 120]);
+            const [currentDurationIndex, setCurrentDurationIndex] = useState(0);
+            const [notifications, setNotifications] = useState([]);
+            const [activeTrades, setActiveTrades] = useState([]);
+            const [closedTrades, setClosedTrades] = useState([]);
+            const [aiLearnedCount, setAiLearnedCount] = useState(0);
+            const [aiConfidence, setAiConfidence] = useState(0.2);
+            const [isOnline, setIsOnline] = useState(true);
 
-            useEffect(() => {
-                const hasActiveTrades = activeTradesUI.length > 0;
-                if (hasActiveTrades) {
-                    if (zoomTargetRef.current > 200) {
-                        preTradeZoomRef.current = zoomTargetRef.current;
-                        isUserInteractingRef.current = false;
-                        zoomTargetRef.current = 160;
-                        setZoom(160);
-                    }
-                } else {
-                    if (preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
-                        zoomTargetRef.current = preTradeZoomRef.current;
-                        setZoom(preTradeZoomRef.current);
-                        preTradeZoomRef.current = null;
-                    }
+            // NUEVO: Estados para gestionar operaciones en botones
+            const [buttonStates, setButtonStates] = useState({
+                buy: { active: false, timeRemaining: 0, expiryTime: null },
+                sell: { active: false, timeRemaining: 0, expiryTime: null }
+            });
+            const [pendingRestores, setPendingRestores] = useState([]); // Para desktop: controlar restauraciones pendientes
+
+            const canvasRef = useRef(null);
+            const containerRef = useRef(null);
+            const pinchStartRef = useRef(null);
+            const isUserInteractingRef = useRef(false);
+            const zoomTargetRef = useRef(zoom);
+            const interactionTimeoutRef = useRef(null);
+            const simulationIntervalRef = useRef(null);
+            const isNotificationVisible = useRef(false);
+            const tradeIdCounterRef = useRef(1);
+            const autopilotLoopRef = useRef(null);
+            const tradesDisabledRef = useRef(false);
+            const [tradesDisabled, setTradesDisabled] = useState(false);
+
+            const currentDuration = durations[currentDurationIndex];
+            const isMobile = window.innerWidth < 768;
+            const MAX_CONCURRENT_TRADES = isMobile ? 1 : 3;
+
+            // Detectar si es mobile
+            const checkMobile = () => window.innerWidth < 768;
+
+            const addNotification = useCallback((data) => {
+                // Filtrar notificaciones de operación abierta/cerrada
+                if (data.type === 'TRADE_OPENED' || data.type === 'TRADE_CLOSED') {
+                    return; // No mostrar estas notificaciones
                 }
-            }, [activeTradesUI.length]);
- 
-            const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
-            const lastSignalRef = useRef(null); 
-            
-            const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
-            const resultLabelsRef = useRef([]);
-            const sigmoid = (x) => 1 / (1 + Math.exp(-x));
-            
-            const trainAI = (features, actualOutcome) => { 
-                const brain = aiBrain.current; 
-                const rawSum = (features.vel * brain.weights.velocity) + (features.acc * brain.weights.acceleration) + (features.z * brain.weights.zScore) + (features.dur * brain.weights.duration) + brain.weights.bias; 
-                const predictedConfidence = sigmoid(rawSum); 
-                const error = actualOutcome - predictedConfidence; 
-                brain.weights.velocity += brain.learningRate * error * features.vel; 
-                brain.weights.acceleration += brain.learningRate * error * features.acc; 
-                brain.weights.zScore += brain.learningRate * error * features.z; 
-                brain.weights.duration += brain.learningRate * error * features.dur; 
-                brain.weights.bias += brain.learningRate * error; 
-                setAiLearnedCount(c => c + 1); 
-            };
-            
-            const addNotification = useCallback((data) => { 
-                if (data.type === 'SIGNAL' && isNotificationVisible.current) return; 
-                if (data.type === 'WIN' || data.type === 'LOSS') return;
-                const id = Date.now() + Math.random(); 
-                const duration = data.type === 'OFFLINE' ? 0 : 4000; 
-                setNotifications(prev => { if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; return prev; }); 
-                if (data.type !== 'OFFLINE') { isNotificationVisible.current = true; setTimeout(() => { setNotifications(prev => prev.filter(n => n.id !== id)); if (notifications.length <= 1) isNotificationVisible.current = false; }, duration); } else { isNotificationVisible.current = true; } 
-            }, []);
-            
-            const generateDNAFromName = (materialIdx, adjectiveIdx) => {
-                const normMat = materialIdx / (MATERIALS.length - 1);
-                const normAdj = adjectiveIdx / (ADJECTIVES.length - 1);
-                const volatility = 0.5 + (normMat * 1.5); 
-                const structure = 0.2 + Math.pow(normAdj, 2) * 0.75; 
-                const seed = (materialIdx * 100) + adjectiveIdx;
-                const pseudoRand = Math.sin(seed) * 0.5 + 0.5; 
-                const trendBias = (pseudoRand - 0.5) * 0.3; 
-                const isStepped = (adjectiveIdx % 3 === 0);
-                return { volatility, aggression: 0.1 + (normMat * 0.7), structure, trendBias, isStepped };
-            };
 
-            const updatePredictor = (newPrice) => { 
-                const state = marketStatesRef.current[activeTab]; 
-                const tickHistory = tickHistoriesRef.current[activeTab];
-                const ks = kinematicsRef.current[activeTab];
-                
-                tickHistory.push(newPrice); 
-                if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); 
-                state.longTermTicks.push(newPrice); 
-                if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); 
-                
-                if (tickHistory.length < 20) return; 
-                
-                const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; 
-                const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; 
-                const acceleration = velocity - ks.lastVelocity; 
-                const n = tickHistory.length; 
-                const mean = tickHistory.reduce((a, b) => a + b, 0) / n; 
-                const stdDev = Math.sqrt(tickHistory.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
-                const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; 
+                if (data.type === 'SIGNAL' && isNotificationVisible.current) return;
 
-                const longTermMean = state.longTermTicks.length > 0 ? state.longTermTicks.reduce((a, b) => a + b, 0) / state.longTermTicks.length : mean;
-                const trendDirection = newPrice > longTermMean ? 1 : -1; 
-                const aggression = state.dna ? state.dna.aggression : 0.5;
-                const zThreshold = 1.6 + (aggression * 0.5); 
-                
-                const isOversold = zScore < -zThreshold;
-                const isPullbackBuy = trendDirection === 1 && zScore < -1.0 && velocity < 0 && acceleration > 0;
-                const isBuySignalRaw = (isOversold && acceleration > ks.delta) || isPullbackBuy;
-
-                const isOverbought = zScore > zThreshold;
-                const isPullbackSell = trendDirection === -1 && zScore > 1.0 && velocity > 0 && acceleration < 0;
-                const isSellSignalRaw = (isOverbought && acceleration < -ks.delta) || isPullbackSell;
-
-                let finalBuy = isBuySignalRaw; 
-                let finalSell = isSellSignalRaw; 
-                
-                const brain = aiBrain.current; 
-                const normalizedDuration = (state.tradeDuration || 10000) / 30000;
-                const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration, trend: trendDirection }; 
-                
-                const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias; 
-                const confidence = sigmoid(rawSum); 
-                
-                ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; 
-                setAiConfidence(confidence); 
-                
-                if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
-                    if (Math.random() < 0.15 || confidence > 0.7) { 
-                        const signalType = finalBuy ? 'BUY' : 'SELL';
-                        const timeSinceLast = Date.now() - (state.lastSignalTime || 0);
-                        if (timeSinceLast > 2000) { 
-                            addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
-                            state.lastSignalTick = state.currentValue;
-                            state.lastSignalTime = Date.now();
-                            if (autopilot && confidence > 0.65 && activeTradesRef.current.length === 0) {
-                                const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
-                                if (lastSignalRef.current !== currentSignal) { 
-                                    lastSignalRef.current = currentSignal;
-                                    setTimeout(() => executeTrade(signalType), 100); 
-                                }
-                            }
-                        }
-                    } 
-                } 
-            };
-
-            const processMarketLogic = (tabIndex, isWarmup = false) => { 
-                const state = marketStatesRef.current[tabIndex]; 
-                const dna = state.dna;
-                state.ticksSincePatternChange++; 
-                if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { 
-                    state.ticksSincePatternChange = 0; 
-                    const randState = Math.random();
-                    const momentumThresh = 0.1 + (dna.aggression * 0.4); 
-                    if (randState < momentumThresh) {
-                        state.patternState = 'MOMENTUM'; 
-                        state.structTotalDuration = Math.floor(60 + Math.random() * 120); 
-                        state.momentumDir = Math.random() > (0.5 - dna.trendBias) ? 1 : -1; 
-                    } else {
-                        if (Math.random() < dna.structure) { 
-                            state.patternState = 'STRUCTURED'; 
-                            state.structTotalDuration = Math.floor(180 + Math.random() * 300); 
-                            state.structPeriodX = Math.floor((15 + Math.random() * 25) * TICK_RATE); 
-                            state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN'; 
-                            state.structTimer = 0; 
-                            state.currentStructLimit = state.structPeriodX; 
-                        } else { 
-                            state.patternState = 'NORMAL'; 
-                            state.structTotalDuration = Math.floor(120 + Math.random() * 180); 
-                        }
+                const id = Date.now() + Math.random();
+                setNotifications(prev => {
+                    if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }];
+                    if (data.type !== 'OFFLINE') {
+                        isNotificationVisible.current = true;
+                        setTimeout(() => {
+                            setNotifications(p => p.filter(n => n.id !== id));
+                            isNotificationVisible.current = false;
+                        }, 5000);
                     }
-                    state.nextPatternSwitchTick = state.structTotalDuration; 
-                } 
-                
-                let drift = 0; let volatilityMult = 1.0;
-                
-                if (state.patternState === 'MOMENTUM') { 
-                    drift = state.momentumDir * 0.6; 
-                    volatilityMult = 2.5; 
-                } 
-                else if (state.patternState === 'STRUCTURED') { 
-                    state.structTimer++; 
-                    if (state.structTimer >= state.currentStructLimit) { 
-                        state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; 
-                        state.structTimer = 0; 
-                        state.currentStructLimit = Math.floor((10 + Math.random() * 40) * TICK_RATE); 
-                    } 
-                    drift = state.structPhase === 'UP' ? 0.18 : -0.18; 
-                    volatilityMult = 1.0; 
-                } else { 
-                    drift = 0; 
-                    volatilityMult = 0.8; 
-                } 
-                
-                drift += dna.trendBias; 
-                const r1 = Math.random(); const r2 = Math.random(); const noise = (r1 + r2) - 1.0; 
-                const baseVol = state.currentValue * 0.0006; 
-                const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
-                
-                if (dna.isStepped && state.patternState !== 'MOMENTUM') {
-                    state.stepBuffer = (state.stepBuffer || 0) + movement;
-                    if (state.ticksSincePatternChange % 8 === 0) {
-                        state.currentValue += state.stepBuffer;
-                        state.stepBuffer = 0; 
-                    }
-                } else {
-                    state.currentValue += movement; 
-                }
-                
-                if (state.currentValue < 10) state.currentValue = 10; 
-                if (isWarmup) state.visualValue = state.currentValue; 
-                state.lastDirection = movement > 0 ? 1 : -1; 
-                
-                if (tabIndex === activeTab) { updatePredictor(state.currentValue); } 
-                else { const tickHistory = tickHistoriesRef.current[tabIndex]; tickHistory.push(state.currentValue); if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); }
-            };
-            
-            const updateVisualCandleLogic = (tabIndex) => { 
-                const state = marketStatesRef.current[tabIndex];
-                state.visualTicks.push(state.visualValue); 
-                
-                if (state.visualTicks.length >= state.ticksPerCandle) { 
-                    const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; 
-                    const close = state.visualTicks[state.visualTicks.length - 1]; 
-                    const newCandle = { 
-                        open: lastCandleClose, 
-                        close, 
-                        high: Math.max(...state.visualTicks, lastCandleClose), 
-                        low: Math.min(...state.visualTicks, lastCandleClose), 
-                        color: close >= lastCandleClose ? '#10b981' : '#f43f5e' 
-                    };
-                    state.candles.push(newCandle); 
-                    state.targetScroll = state.candles.length; 
-                    state.visualTicks = []; 
-                    
-                    const MAX_CANDLES = 600; 
-                    if (state.candles.length > MAX_CANDLES) {
-                        const deleteCount = state.candles.length - MAX_CANDLES;
-                        state.candles.splice(0, deleteCount);
-                        state.scrollOffset -= deleteCount;
-                        state.targetScroll -= deleteCount;
-                    } 
-                } 
-            };
-
-            const warmUpMarket = (tabIndex, minutes = 10) => { 
-                const state = marketStatesRef.current[tabIndex];
-                const ticksToSimulate = minutes * 60 * TICK_RATE; 
-                for (let i = 0; i < ticksToSimulate; i++) { processMarketLogic(tabIndex, true); updateVisualCandleLogic(tabIndex); } 
-                state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; state.initialized = true;
-            };
-            
-            const generateAssetForTab = useCallback((tabIndex) => {
-                const now = Date.now();
-                assetHistoryRef.current = assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
-                let attempts = 0; let selectedName = ""; let matIdx, adjIdx;
-                const findAvailableAsset = () => {
-                    while (attempts < 100) {
-                        attempts++;
-                        const matRand = (Math.random() + Math.random()) / 2;
-                        const adjRand = (Math.random() + Math.random()) / 2;
-                        const mIdx = Math.floor(matRand * MATERIALS.length);
-                        const aIdx = Math.floor(adjRand * ADJECTIVES.length);
-                        const fullName = `${MATERIALS[mIdx]} ${ADJECTIVES[aIdx]}`;
-                        const isCurrentlyActive = assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
-                        const inHistory = assetHistoryRef.current.some(a => a.name === fullName);
-                        if (!isCurrentlyActive && !inHistory) {
-                            selectedName = fullName; matIdx = mIdx; adjIdx = aIdx;
-                            assetHistoryRef.current.push({ name: fullName, timestamp: now });
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-                if (!findAvailableAsset()) { setTimeout(() => generateAssetForTab(tabIndex), 500); return; }
-                const rand = Math.pow(Math.random(), 2.5); 
-                const newBasePrice = 1000 + (1 - rand) * 99000; 
-                const dna = generateDNAFromName(matIdx, adjIdx);
-                let preferredDurations;
-                if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; } 
-                else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; } 
-                else { preferredDurations = [5000, 10000, 15000, 30000]; }
-                const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
-                tickHistoriesRef.current[tabIndex] = [];
-                kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
-                marketStatesRef.current[tabIndex] = { ...createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
-                
-                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15; 
-                warmUpMarket(tabIndex, randomWarmupMinutes);
-                setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
-                if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }
-                setIsGenerating(false);
-            }, [activeTab, assetsInfo]);
-
-            useEffect(() => {
-                if (!marketStatesRef.current[0].initialized) { 
-                    setIsGenerating(true);
-                    setTimeout(() => generateAssetForTab(0), 10);
-                    setTimeout(() => generateAssetForTab(1), 50);
-                    setTimeout(() => generateAssetForTab(2), 100);
-                }
+                    return [...prev, { ...data, id }];
+                });
             }, []);
 
-            const handleTabChange = (index) => {
-                setActiveTab(index);
-                const state = marketStatesRef.current[index];
-                setCurrentDuration(state.tradeDuration / 1000);
-                setCurrentPriceUI(state.visualValue);
-            };
-            
-            const handleGenerateAsset = () => { 
-                if (isGenerating) return; 
-                setIsGenerating(true); 
-                setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
-            };
-            
-            const executeTrade = (type) => { 
-                if (!isOnline) return; 
-                const maxTrades = autopilot ? 1 : 4;
-                if (activeTradesRef.current.length >= maxTrades) return;
-                setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
-                isNotificationVisible.current = false; 
-                const state = marketStatesRef.current[activeTab]; 
-                const ks = kinematicsRef.current[activeTab];
-                const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
-                const now = Date.now(); 
-                const duration = state.tradeDuration || 10000;
-                const newTrade = { 
-                    id: Date.now() + Math.random(), type, entryPrice: state.visualValue, 
-                    entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + duration, 
-                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab 
-                }; 
-                activeTradesRef.current.push(newTrade); 
-                setActiveTradesUI([...activeTradesRef.current]); 
-                setBalance(prev => prev - INVESTMENT_AMOUNT); 
-            };
-
-            const handleNotificationClick = (notification) => {
-                if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
-            };
-
-            // --- GESTIÓN DE CONEXIÓN A INTERNET ---
             useEffect(() => {
-                const handleOnline = () => {
-                    setIsOnline(true);
-                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
-                    
-                    // --- LÓGICA DE CATCH-UP AL VOLVER LA RED ---
-                    const now = Date.now();
-                    // Calculamos cuánto tiempo estuvimos offline
-                    const timeMissed = now - lastLogicTimeRef.current;
-                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-                    
-                    // Si estuvimos offline menos de ~16 min (10000 ticks), simulamos el paso del tiempo
-                    if (ticksMissed > 0 && ticksMissed < 10000) { 
-                        // Ejecutamos la lógica en bucle rápido para "rellenar" el hueco
-                        for (let i = 0; i < ticksMissed; i++) {
-                            runMarketLogic();
-                        }
-                    } 
-                    // Actualizamos la referencia temporal al presente
-                    lastLogicTimeRef.current = now; 
+                const handleOnline = () => { 
+                    setIsOnline(true); 
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE')); 
                 };
-                
-                const handleOffline = () => {
-                    setIsOnline(false);
-                    addNotification({ type: 'OFFLINE' });
-                    // No tocamos lastLogicTimeRef aquí para que se quede "congelado" en el momento de la desconexión
+                const handleOffline = () => { 
+                    setIsOnline(false); 
+                    addNotification({ type: 'OFFLINE' }); 
                 };
 
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
+
+                if (!navigator.onLine) addNotification({ type: 'OFFLINE' });
 
                 return () => {
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
                 };
             }, [addNotification]);
-            
-            // --- MAIN LOOP UNIFICADO ---
+
+            // Actualizar tiempo restante en botones
             useEffect(() => {
-                let animationId;
-                const LOGIC_RATE_MS = 1000 / TICK_RATE;
-                
-                // Usamos referencias mutables para mantener estado entre frames
-                const lastLogicTimeRef = { current: Date.now() };
-                const isTabVisibleRef = { current: !document.hidden };
+                const interval = setInterval(() => {
+                    setButtonStates(prev => {
+                        const now = Date.now();
+                        const newStates = { ...prev };
 
-                // Lógica del Mercado (Reutilizable)
-                const runMarketLogic = () => {
-                    processMarketLogic(0); updateVisualCandleLogic(0);
-                    processMarketLogic(1); updateVisualCandleLogic(1);
-                    processMarketLogic(2); updateVisualCandleLogic(2);
-                    
-                    const state = marketStatesRef.current[activeTab];
-                    const ks = kinematicsRef.current[activeTab];
-                    if (state && ks) {
-                        const currentTicksToWait = Math.floor((state.tradeDuration || 10000) / 1000 * TICK_RATE);
-                        const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
-                        const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
-                        if (isBuy || isSell) {
-                           aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: currentTicksToWait, featuresSnapshot: { ...ks.currentFeatures } });
-                        }
-                        aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(t.featuresSnapshot, isWin ? 1 : 0); return false; } return true; });
-                    }
-                };
+                        ['buy', 'sell'].forEach(key => {
+                            if (newStates[key].active && newStates[key].expiryTime) {
+                                const remaining = Math.max(0, (newStates[key].expiryTime - now) / 1000);
+                                newStates[key].timeRemaining = remaining;
 
-                // Función de Catch-up (Relleno de tiempo perdido)
-                 const performCatchUp = () => {
-                    const now = Date.now();
-                    const timeMissed = now - lastLogicTimeRef.current;
-                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-                    
-                    // Si perdimos tiempo (pero no una eternidad > 15 min)
-                    if (ticksMissed > 0 && ticksMissed < 10000) {
-                        // Ejecutamos la lógica N veces instantáneamente
-                        for (let i = 0; i < ticksMissed; i++) {
-                            runMarketLogic();
-                        }
-                        // Avanzamos el reloj lógico para que coincida con el ahora
-                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
-                    } else if (ticksMissed >= 10000) {
-                        // Si pasó demasiado tiempo, simplemente reseteamos (teletransporte)
-                        lastLogicTimeRef.current = now;
-                    }
-
-                    const performCatchUp = () => {
-                    const now = Date.now();
-                    const timeMissed = now - lastLogicTimeRef.current;
-                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-                    
-                    if (ticksMissed > 0 && ticksMissed < 10000) {
-                        for (let i = 0; i < ticksMissed; i++) {
-                            runMarketLogic();
-                        }
-                        
-                        // --- CORRECCIÓN CLAVE ---
-                        // Forzamos la actualización inmediata del scroll para que la cámara salte a las nuevas velas
-                        // Aplicamos esto a las 3 pestañas para que no se descuadren
-                        [0, 1, 2].forEach(idx => {
-                            const s = marketStatesRef.current[idx];
-                            s.targetScroll = s.candles.length; 
-                            s.scrollOffset = s.candles.length; // Salto instantáneo, sin suavizado
-                            s.visualValue = s.currentValue; // Sincronizar valor visual con lógico
-                        });
-                        
-                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
-                    } else if (ticksMissed >= 10000) {
-                        lastLogicTimeRef.current = now;
-                    }
-                };
-
-                };
-
-                // Listeners de Eventos
-                const handleVisibilityChange = () => {
-                    isTabVisibleRef.current = !document.hidden;
-                    if (isTabVisibleRef.current && navigator.onLine) {
-                        performCatchUp();
-                    }
-                };
-
-                const handleOnline = () => {
-                    setIsOnline(true);
-                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
-                    if (isTabVisibleRef.current) {
-                        performCatchUp(); // <--- AQUÍ ESTÁ LA MAGIA QUE FALTABA
-                    }
-                };
-
-                const handleOffline = () => {
-                    setIsOnline(false);
-                    addNotification({ type: 'OFFLINE' });
-                    // No actualizamos lastLogicTimeRef, dejamos que se quede atrás
-                };
-
-                document.addEventListener("visibilitychange", handleVisibilityChange);
-                window.addEventListener('online', handleOnline);
-                window.addEventListener('offline', handleOffline);
-
-                // LOOP PRINCIPAL (DIBUJO + LÓGICA)
-                const loop = () => {
-                    animationId = requestAnimationFrame(loop);
-                    
-                    const now = Date.now();
-                    
-                    // Si estamos offline o minimizados, NO corremos lógica ni dibujo
-                    // Esto "congela" el lastLogicTimeRef en el pasado
-                    if (!navigator.onLine || !isTabVisibleRef.current) return;
-
-                    // Lógica Normal (Paso a paso)
-                    const deltaTime = now - lastLogicTimeRef.current;
-                    if (deltaTime >= LOGIC_RATE_MS) {
-                        const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
-                        // Límite de seguridad por si el frame rate cae mucho
-                        const safeTicks = Math.min(ticksToProcess, 10); 
-                        
-                        for (let i = 0; i < safeTicks; i++) {
-                            runMarketLogic();
-                        }
-                        lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;
-                        
-                        // Procesar Trades Expirados
-                        const realNow = Date.now();
-                        const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
-                        if (expiredTrades.length > 0) {
-                            let totalPayout = 0;
-                            expiredTrades.forEach(trade => {
-                                const tradeState = marketStatesRef.current[trade.tabIndex];
-                                const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
-                                if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0);
-                                if (trade.tabIndex === activeTab) {
-                                    const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
-                                    resultLabelsRef.current.push({
-                                        id: Date.now() + Math.random(), xIndex: currentPreciseIndex,
-                                        price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount,
-                                        timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS'
-                                    });
+                                // En mobile, resetear botón cuando termina la operación
+                                if (remaining <= 0 && isMobile) {
+                                    newStates[key] = { active: false, timeRemaining: 0, expiryTime: null };
                                 }
-                                if (isWin) { totalPayout += trade.amount * 1.85; }
-                            });
-                            activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
-                            setActiveTradesUI([...activeTradesRef.current]);
-                            if (totalPayout > 0) setBalance(b => b + totalPayout);
+                            }
+                        });
+
+                        return newStates;
+                    });
+                }, 100);
+
+                return () => clearInterval(interval);
+            }, [isMobile]);
+
+            // Desktop: Manejar restauraciones pendientes
+            useEffect(() => {
+                if (!isMobile && pendingRestores.length > 0) {
+                    const now = Date.now();
+                    const toRestore = pendingRestores.filter(restore => now >= restore.restoreTime);
+
+                    if (toRestore.length > 0) {
+                        toRestore.forEach(restore => {
+                            setButtonStates(prev => ({
+                                ...prev,
+                                [restore.type]: { active: false, timeRemaining: 0, expiryTime: null }
+                            }));
+                        });
+
+                        setPendingRestores(prev => prev.filter(restore => now < restore.restoreTime));
+
+                        // Habilitar botones si ya no hay operaciones activas
+                        const anyActive = Object.values(buttonStates).some(state => state.active);
+                        if (!anyActive) {
+                            setTradesDisabled(false);
+                            tradesDisabledRef.current = false;
                         }
                     }
+                }
+            }, [pendingRestores, buttonStates, isMobile]);
 
-                    // Renderizado (UI Updates)
-                    const state = marketStatesRef.current[activeTab]; 
-                    if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
-                        setCurrentPriceUI(state.visualValue);
-                        setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
-                        lastUIUpdateRef.current = now;
+            const executeTrade = useCallback((type) => {
+                if (tradesDisabledRef.current) return;
+
+                const activeCount = activeTrades.filter(t => t.tabIndex === activeTab).length;
+
+                // Verificar límite de operaciones concurrentes
+                if (activeCount >= MAX_CONCURRENT_TRADES) return;
+
+                const currentPrice = priceData[activeTab].price;
+                const tradeId = tradeIdCounterRef.current++;
+                const expiryTime = Date.now() + (currentDuration * 1000);
+
+                const newTrade = {
+                    id: tradeId,
+                    type,
+                    entryPrice: currentPrice,
+                    expiryTime,
+                    tabIndex: activeTab,
+                    duration: currentDuration
+                };
+
+                setActiveTrades(prev => [...prev, newTrade]);
+
+                // Actualizar estado del botón
+                const buttonKey = type === 'BUY' ? 'buy' : 'sell';
+                setButtonStates(prev => ({
+                    ...prev,
+                    [buttonKey]: { active: true, timeRemaining: currentDuration, expiryTime }
+                }));
+
+                // Desktop: Programar restauración después de 5 segundos
+                if (!isMobile) {
+                    const restoreTime = Date.now() + 5000;
+                    setPendingRestores(prev => [...prev, { type: buttonKey, restoreTime }]);
+
+                    // Deshabilitar botones durante 5 segundos
+                    setTradesDisabled(true);
+                    tradesDisabledRef.current = true;
+
+                    setTimeout(() => {
+                        const stillActive = activeTrades.filter(t => t.expiryTime > Date.now()).length;
+                        if (stillActive < MAX_CONCURRENT_TRADES) {
+                            setTradesDisabled(false);
+                            tradesDisabledRef.current = false;
+                        }
+                    }, 5000);
+                }
+
+                // Mobile: Deshabilitar botones hasta que termine la operación
+                if (isMobile) {
+                    setTradesDisabled(true);
+                    tradesDisabledRef.current = true;
+                }
+
+                setTimeout(() => {
+                    const exitPrice = priceData[activeTab].price;
+                    const priceDiff = exitPrice - currentPrice;
+                    const isWin = (type === 'BUY' && priceDiff > 0) || (type === 'SELL' && priceDiff < 0);
+                    const pnl = isWin ? 100 : -100;
+
+                    setBalance(prev => prev + pnl);
+                    setActiveTrades(prev => prev.filter(t => t.id !== tradeId));
+                    setClosedTrades(prev => [...prev, { ...newTrade, exitPrice, pnl, isWin }]);
+
+                    setAiLearnedCount(c => c + 1);
+                    if (isWin) setAiConfidence(c => Math.min(1, c + 0.02));
+                    else setAiConfidence(c => Math.max(0, c - 0.01));
+
+                    // Mobile: Restaurar botón y habilitar
+                    if (isMobile) {
+                        setButtonStates(prev => ({
+                            ...prev,
+                            [buttonKey]: { active: false, timeRemaining: 0, expiryTime: null }
+                        }));
+                        setTradesDisabled(false);
+                        tradesDisabledRef.current = false;
                     }
+                }, currentDuration * 1000);
 
-                    // --- AQUI VA TU CÓDIGO DE CANVAS / DIBUJO ---
-                    // (Pega aquí todo el bloque 'const canvas = canvasRef.current ...' hasta el final del dibujo)
-                    const canvas = canvasRef.current;
-                    if (canvas) {
-                         const dpr = window.devicePixelRatio || 1;
-                        const width = canvas.width / dpr;
-                        const height = canvas.height / dpr;
-                        const ctx = canvas.getContext('2d');
-                        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                        
-                        const SMOOTHING = 0.05;
-                        state.visualValue += (state.currentValue - state.visualValue) * 0.3;
-                        state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
-                        ctx.fillStyle = '#050505';
-                        ctx.fillRect(0, 0, width, height);
-                        const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
-                        let allCandles = [...state.candles];
-                        allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
-                        
-                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * SMOOTHING;
-                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.05) zoomCurrentRef.current = zoomTargetRef.current;
-                        const candleWidth = width / zoomCurrentRef.current;
-                        
-                        let targetAnchorPercent = 0.75;
-                        const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); 
-                        if (activeTrades.length > 0) {
-                            const maxDuration = Math.max(...activeTrades.map(t => t.duration));
-                            if (maxDuration >= 30000) targetAnchorPercent = 0.50;
-                            else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
-                        }
-                        if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
-                        state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * SMOOTHING;
-                        const anchorX = width * state.currentAnchor;
-                        const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
-                        
-                        let minPrice = Infinity, maxPrice = -Infinity;
-                        allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
-                        if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+            }, [activeTab, priceData, currentDuration, activeTrades, MAX_CONCURRENT_TRADES, isMobile]);
 
-                        if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
-                        const rawRange = maxPrice - minPrice || 10;
-                        const targetPadding = rawRange * 0.45;
-                        const targetMin = minPrice - targetPadding;
-                        const targetMax = maxPrice + targetPadding;
-                        const VERTICAL_SMOOTHING = 0.05; 
-                        state.visualMinPrice += (targetMin - state.visualMinPrice) * VERTICAL_SMOOTHING;
-                        state.visualMaxPrice += (targetMax - state.visualMaxPrice) * VERTICAL_SMOOTHING;
-                        let yMin = state.visualMinPrice;
-                        let yMax = state.visualMaxPrice;
+            const handleNotificationClick = (notification) => {
+                if (notification.type === 'SIGNAL') {
+                    executeTrade(notification.signalType);
+                }
+            };
 
-                        const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
-                        const safeZoneBottom = Math.min(height - 250, height * 0.65);
-                        if (currentPriceY > safeZoneBottom) {
-                            const pixelsOff = currentPriceY - safeZoneBottom;
-                            const pricePerPixel = (yMax - yMin) / height;
-                            const priceShift = pixelsOff * pricePerPixel;
-                            state.visualMinPrice -= priceShift * 0.1;
-                            state.visualMaxPrice -= priceShift * 0.1;
-                            yMin = state.visualMinPrice;
-                            yMax = state.visualMaxPrice;
-                        }
-                        
-                        const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
-                        const currentY = getY(state.visualValue);
-                        ctx.strokeStyle = '#222';
-                        ctx.setLineDash([4, 4]);
-                        ctx.beginPath();
-                        ctx.moveTo(0, currentY);
-                        ctx.lineTo(width, currentY);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        
-                        const previewDuration = state.tradeDuration || 10000;
-                        const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
-                        const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
-                        const xFuture = getX(futureIndex);
-                        const xCurrent = getX(currentPreciseIndex);
-                        ctx.strokeStyle = activeTrades.length > 0 ? '#333' : '#666'; 
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([2, 4]);
-                        ctx.beginPath();
-                        ctx.moveTo(xCurrent, currentY);
-                        ctx.lineTo(xFuture, currentY);
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.moveTo(xFuture, currentY - 20);
-                        ctx.lineTo(xFuture, currentY + 20);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-
-                        const barWidth = Math.max(1, candleWidth * 0.8);
-                        allCandles.forEach((candle, i) => {
-                            const x = getX(i);
-                            if (x < -candleWidth || x > width + candleWidth) return;
-                            const yOpen = getY(candle.open), yClose = getY(candle.close), yHigh = getY(candle.high), yLow = getY(candle.low);
-                            ctx.strokeStyle = candle.color;
-                            ctx.lineWidth = Math.max(1, candleWidth * 0.1);
-                            ctx.beginPath();
-                            ctx.moveTo(x, yHigh);
-                            ctx.lineTo(x, yLow);
-                            ctx.stroke();
-                            const bodyHeight = Math.max(0.5, Math.abs(yClose - yOpen));
-                            ctx.fillStyle = candle.color;
-                            if (candle.isForming) { ctx.shadowBlur = 10; ctx.shadowColor = candle.color; }
-                            ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight);
-                            ctx.shadowBlur = 0;
+            useEffect(() => {
+                const generateSignal = () => {
+                    if (autopilot && !isNotificationVisible.current && isOnline) {
+                        const signalType = Math.random() > 0.5 ? 'BUY' : 'SELL';
+                        const confidence = 0.6 + Math.random() * 0.3;
+                        const newPrice = priceData[activeTab].price;
+                        addNotification({
+                            type: 'SIGNAL',
+                            signalType: signalType,
+                            confidence: confidence,
+                            price: newPrice
                         });
-
-                        activeTrades.forEach(trade => {
-                            const yEntry = getY(trade.entryPrice);
-                            const xEntry = getX(trade.entryIndex);
-                            const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
-                            const futureIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle) + (remainingSeconds * TICK_RATE / state.ticksPerCandle);
-                            const xExpire = getX(futureIndex);
-                            const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
-                            ctx.strokeStyle = tradeColor;
-                            ctx.lineWidth = 1;
-                            ctx.globalAlpha = 0.5;
-                            ctx.beginPath();
-                            ctx.moveTo(xEntry, yEntry);
-                            ctx.lineTo(width, yEntry);
-                            ctx.stroke();
-                            ctx.setLineDash([4, 4]);
-                            ctx.beginPath();
-                            ctx.moveTo(xExpire, yEntry - 40);
-                            ctx.lineTo(xExpire, yEntry + 40);
-                            ctx.stroke();
-                            ctx.setLineDash([]);
-                            ctx.globalAlpha = 0.3;
-                            ctx.beginPath();
-                            ctx.moveTo(xEntry, yEntry);
-                            ctx.lineTo(xExpire, yEntry);
-                            ctx.stroke();
-                            ctx.globalAlpha = 1;
-                            ctx.fillStyle = tradeColor;
-                            ctx.beginPath();
-                            ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
-                            ctx.fill();
-                        });
-
-                        resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); 
-                        resultLabelsRef.current.forEach(label => {
-                            const age = Date.now() - label.timestamp;
-                            const progress = age / 2000;
-                            
-                            // LÓGICA DE DIRECCIÓN
-                            // Si es WIN (profit > 0), sube (-50). Si es LOSS, baja (+50).
-                            const direction = label.profit > 0 ? -1 : 1;
-                            const yPos = getY(label.price) - 30 + (progress * 50 * direction); 
-                            const xPos = getX(label.xIndex);
-                            const opacity = 1 - Math.pow(progress, 3); 
-                            ctx.globalAlpha = opacity;
-                            const bg = label.type === 'WIN' ? '#10B981' : '#F43F5E';
-                            const shadowColor = label.type === 'WIN' ? 'rgba(16, 185, 129, 0.40)' : 'rgba(244, 63, 94, 0.40)';
-                            ctx.fillStyle = bg;
-                            ctx.shadowBlur = 20;
-                            ctx.shadowColor = shadowColor;
-                            const labelW = 100;
-                            const labelH = 40;
-                            ctx.beginPath();
-                            ctx.roundRect(xPos - labelW/2, yPos - labelH/2, labelW, labelH, 20);
-                            ctx.fill();
-                            ctx.shadowBlur = 0;
-                            ctx.fillStyle = '#000000'; 
-                            ctx.font = '500 14px "BDO Grotesk", sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            const prefix = label.profit > 0 ? '+' : '-';
-                            ctx.fillText(`${prefix} $${Math.abs(label.profit).toFixed(0)}`, xPos, yPos);
-                        });
-                        ctx.globalAlpha = 1;
-
-                        const isSmallScreen = width < 768;
-                        const labelX = isSmallScreen ? 0 : width - 100;
-                        const textX = isSmallScreen ? 50 : width - 50;
-                        ctx.fillStyle = '#111';
-                        ctx.fillRect(labelX, currentY - 10, 100, 20);
-                        ctx.fillStyle = '#fff';
-                        ctx.font = 'bold 12px monospace';
-                        ctx.textAlign = 'center';
-                        ctx.fillText(state.visualValue.toFixed(2), textX, currentY + 5);
                     }
                 };
-                
-                lastLogicTimeRef.current = Date.now();
-                loop(); // Iniciamos el loop unificado
+
+                if (autopilot) {
+                    autopilotLoopRef.current = setInterval(generateSignal, 8000);
+                } else {
+                    if (autopilotLoopRef.current) {
+                        clearInterval(autopilotLoopRef.current);
+                        autopilotLoopRef.current = null;
+                    }
+                    setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
+                    isNotificationVisible.current = false;
+                }
 
                 return () => {
-                    cancelAnimationFrame(animationId);
-                    document.removeEventListener("visibilitychange", handleVisibilityChange);
-                    window.removeEventListener('online', handleOnline);
-                    window.removeEventListener('offline', handleOffline);
+                    if (autopilotLoopRef.current) {
+                        clearInterval(autopilotLoopRef.current);
+                        autopilotLoopRef.current = null;
+                    }
                 };
-            }, [zoom, addNotification, activeTab, autopilot]);
+            }, [autopilot, priceData, activeTab, addNotification, isOnline]);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d', { 
+                    alpha: false, 
+                    desynchronized: true 
+                });
+
+                const resizeCanvas = () => {
+                    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+                    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+                    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                };
+
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                return () => window.removeEventListener('resize', resizeCanvas);
+            }, []);
+
+            useEffect(() => {
+                const updatePrices = () => {
+                    setPriceData(prev => prev.map((data, idx) => {
+                        const volatility = assetsInfo[idx].initialPrice * 0.0002;
+                        const change = (Math.random() - 0.5) * volatility * 2;
+                        const newPrice = data.price + change;
+                        const newHistory = [...data.history, newPrice].slice(-1000);
+                        return { price: newPrice, history: newHistory };
+                    }));
+                };
+
+                updatePrices();
+                simulationIntervalRef.current = setInterval(updatePrices, 100);
+
+                return () => {
+                    if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
+                };
+            }, []);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+                const width = canvas.offsetWidth;
+                const height = canvas.offsetHeight;
+
+                const draw = () => {
+                    ctx.fillStyle = '#050505';
+                    ctx.fillRect(0, 0, width, height);
+
+                    const history = priceData[activeTab].history;
+                    if (history.length < 2) return;
+
+                    const visiblePoints = Math.floor(zoom * 2);
+                    const dataSlice = history.slice(-visiblePoints);
+
+                    const minPrice = Math.min(...dataSlice);
+                    const maxPrice = Math.max(...dataSlice);
+                    const priceRange = maxPrice - minPrice || 1;
+
+                    const padding = height * 0.1;
+                    const chartHeight = height - 2 * padding;
+
+                    const xStep = width / (dataSlice.length - 1);
+
+                    ctx.strokeStyle = assetsInfo[activeTab].color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+
+                    dataSlice.forEach((price, i) => {
+                        const x = i * xStep;
+                        const y = padding + chartHeight * (1 - (price - minPrice) / priceRange);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+
+                    ctx.stroke();
+
+                    const currentPrice = dataSlice[dataSlice.length - 1];
+                    const currentY = padding + chartHeight * (1 - (currentPrice - minPrice) / priceRange);
+
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(0, currentY);
+                    ctx.lineTo(width, currentY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = assetsInfo[activeTab].color;
+                    ctx.beginPath();
+                    ctx.arc(width - 5, currentY, 4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.font = '12px BDO Grotesk';
+                    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(currentPrice.toFixed(2), width - 15, currentY - 10);
+                };
+
+                draw();
+            }, [priceData, activeTab, zoom]);
+
+            useEffect(() => {
+                if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
+
+                interactionTimeoutRef.current = setTimeout(() => {
+                    isUserInteractingRef.current = false;
+                }, 500);
+
+                return () => {
+                    if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
+                };
+            }, [zoom]);
+
+            const handleWheel = useCallback((e) => {
+                e.preventDefault();
+                isUserInteractingRef.current = true;
+
+                const delta = -e.deltaY * 0.2;
+                const newZoom = Math.max(20, Math.min(500, zoom + delta));
+
+                zoomTargetRef.current = newZoom;
+                setZoom(newZoom);
+            }, [zoom]);
 
             useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-                const resizeObserver = new ResizeObserver((entries) => {
-                    const entry = entries[0];
-                    if (!entry) return;
-                    const { width, height } = entry.contentRect;
-                    if (width === 0 || height === 0) return;
-                    const canvas = canvasRef.current;
-                    if (canvas) {
-                        const dpr = window.devicePixelRatio || 1;
-                        canvas.width = width * dpr;
-                        canvas.height = height * dpr;
-                        canvas.style.width = `${width}px`;
-                        canvas.style.height = `${height}px`;
-                        isMobileRef.current = width < 768;
+
+                container.addEventListener('wheel', handleWheel, { passive: false });
+
+                return () => container.removeEventListener('wheel', handleWheel);
+            }, [handleWheel]);
+
+            useEffect(() => {
+                const handleTouchStart = (e) => {
+                    if (e.touches.length === 2) {
+                        e.preventDefault();
+                        const touch1 = e.touches[0];
+                        const touch2 = e.touches[1];
+                        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+                        pinchStartRef.current = { distance: dist, zoom };
+                        isUserInteractingRef.current = true;
                     }
-                });
-                resizeObserver.observe(container);
-                return () => resizeObserver.disconnect();
-            }, []);
+                };
 
-            const sliderPercentage = ((zoom - 80) / (500 - 80)) * 100;
+                const handleTouchMove = (e) => {
+                    if (e.touches.length === 2 && pinchStartRef.current) {
+                        e.preventDefault();
+                        const touch1 = e.touches[0];
+                        const touch2 = e.touches[1];
+                        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+                        const scale = dist / pinchStartRef.current.distance;
+                        const newZoom = Math.max(20, Math.min(500, pinchStartRef.current.zoom * scale));
+                        zoomTargetRef.current = newZoom;
+                        setZoom(newZoom);
+                    }
+                };
 
-            const maxTrades = autopilot ? 1 : 4;
-            const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= maxTrades;
+                const handleTouchEnd = (e) => {
+                    if (e.touches.length < 2) {
+                        pinchStartRef.current = null;
+                    }
+                };
+
+                const container = containerRef.current;
+                if (container) {
+                    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    container.addEventListener('touchend', handleTouchEnd);
+                }
+
+                return () => {
+                    if (container) {
+                        container.removeEventListener('touchstart', handleTouchStart);
+                        container.removeEventListener('touchmove', handleTouchMove);
+                        container.removeEventListener('touchend', handleTouchEnd);
+                    }
+                };
+            }, [zoom, addNotification, activeTab, autopilot]);
+
+            const activeTradesUI = activeTrades.filter(t => t.tabIndex === activeTab);
+            const totalPnL = balance + totalInvested - 10000;
+            const pnlClass = totalPnL >= 0 ? 'text-[#10B981]' : 'text-[#F43F5E]';
+            const pnlSign = totalPnL >= 0 ? '+' : '';
 
             return (
-                // Usamos estilo inline o clase arbitraria de Tailwind para dvh
-            <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
-                    <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
-                        <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
-                    </div>
-                    <div className="absolute top-10 left-0 w-full px-6 md:px-10 flex justify-between items-center z-20 pointer-events-none">
-                        <div className="flex flex-col justify-center items-start gap-2">
-                            <div className="opacity-50 text-[10px] font-normal leading-tight">BALANCE GLOBAL</div>
-                            <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
-                        </div>
-
-                        {/* --- TABS ESTILO CAJA --- */}
-                        <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
-                            {assetsInfo.map((info, idx) => {
-                                const isActive = activeTab === idx;
-                                return (
-                                    <div 
-                                        key={idx}
-                                        onClick={() => handleTabChange(idx)}
-                                        className={`
-                                            tab-item h-[60px] px-10 flex items-center justify-center gap-[10px]
-                                            ${isActive ? 'border border-white' : 'border border-white/40'}
-                                            overflow-hidden
-                                        `}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            {isActive && (
-                                                <div className="w-2 h-2 bg-white rounded-full"></div>
-                                            )}
-                                            <div className={`
-                                                text-sm font-normal font-sans leading-none uppercase
-                                                ${isActive ? 'text-white' : 'text-white/40'}
-                                            `}>
-                                                {info.name}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex md:hidden items-center gap-2">
-                             <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-white animate-pulse' : 'bg-[#D9D9D9]'}`} />
-                             <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetsInfo[activeTab].name}</div>
-                        </div>
-
-                        <div className="flex flex-col justify-center items-end gap-2">
-                            <div className="opacity-50 text-[10px] font-normal leading-tight">MERCADO EN VIVO</div>
-                            <div className="text-sm font-normal leading-tight">${currentPriceUI.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                        </div>
+                <div className="relative w-screen h-screen">
+                    <div ref={containerRef} className="absolute inset-0 bg-[#050505]">
+                        <canvas ref={canvasRef} className="w-full h-full" />
                     </div>
 
-                    <div className="absolute top-[100px] md:top-[140px] w-full flex flex-col items-center gap-4 z-30 pointer-events-none px-4">
-                        {!isOnline && (
-                            <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                                <img src={ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                                <div className="flex flex-col justify-center items-start gap-1">
-                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
-                                    <div className="text-sm font-medium">SIN CONEXIÓN Wi-Fi</div>
+                    <div className="absolute top-4 md:top-6 left-6 md:left-10 right-6 md:right-10 z-20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0 pointer-events-auto">
+                        <div className="flex items-center gap-3">
+                            <div className="glass-panel px-4 py-2 flex items-center gap-3">
+                                <div className="text-white/40 text-xs font-normal">SALDO</div>
+                                <div className="text-white text-lg font-bold">${balance.toFixed(2)}</div>
+                                <div className={`${pnlClass} text-xs font-medium`}>{pnlSign}${totalPnL.toFixed(2)}</div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <div className="glass-panel px-3 py-2 flex items-center gap-2 md:gap-3 text-xs md:text-sm">
+                                <img src={ICONS.zap} className="w-4 h-4 text-white" style={{ filter: 'invert(1)' }} />
+                                <span className="text-white/60 font-normal hidden md:inline">Autopilot</span>
+                                <div 
+                                    className={`toggle-switch ${autopilot ? 'active' : ''}`}
+                                    onClick={() => setAutopilot(!autopilot)}
+                                >
+                                    <div className="toggle-knob"></div>
                                 </div>
                             </div>
-                        )}
+                        </div>
+                    </div>
 
-                        {notifications.map(note => {
-                            let iconSrc = ICONS.activityNeutral;
-                            let iconClass = "w-5 h-5";
-                            let iconStyle = {};
-
-                            if(note.type === 'SIGNAL') {
-                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
-                            }
+                    <div className="absolute top-20 md:top-24 left-1/2 transform -translate-x-1/2 z-20 flex flex-col gap-2 max-w-md w-full px-4 pointer-events-auto">
+                        {notifications.filter(n => n.type !== 'TRADE_OPENED' && n.type !== 'TRADE_CLOSED').map(note => {
+                            const isBuy = note.signalType === 'BUY';
+                            const bgColor = note.type === 'OFFLINE' ? 'bg-white/5' : (isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]');
+                            const shadowClass = note.type === 'OFFLINE' ? '' : (isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]');
+                            const icon = note.type === 'OFFLINE' ? ICONS.globe : (isBuy ? ICONS.trendingUp : ICONS.trendingDown);
+                            const iconStyle = (note.type !== 'OFFLINE' && !isBuy) ? { transform: 'scaleY(-1)' } : {};
 
                             return (
                                 <div 
                                     key={note.id} 
+                                    className={`h-[62px] py-2 pl-2 pr-[22px] ${note.type === 'OFFLINE' ? 'bg-white/10' : bgColor} ${shadowClass} rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] cursor-pointer active:scale-95 transition-transform animate-fade-in`}
                                     onClick={() => handleNotificationClick(note)}
-                                    className={`glass-panel !bg-white/0 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                                 >
-
-                                    <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
-                                        <img src={iconSrc} className={`${iconClass}`} style={{filter: 'brightness(0) invert(1)'}}/>
+                                    <div className={`w-12 h-12 ${note.type === 'OFFLINE' ? 'bg-white/10' : 'bg-black/20'} rounded-[15px] flex items-center justify-center shrink-0`}>
+                                        <img src={icon} className="w-5 h-5 brightness-0 invert" style={iconStyle} />
                                     </div>
-
-                                    <div className="flex flex-col animate-blink justify-center items-start gap-1">
+                                    <div className="flex flex-col justify-center items-start gap-0 flex-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
                                             {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
                                         </div>
@@ -1092,29 +644,24 @@
 
                             return (
                                 <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                                                    {/* Icono */}
-                                <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                    <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
-                                </div>
-                                
-                                {/* Contenedor de Textos (Ocupa el resto del espacio) */}
-                                <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
-                                    {/* Etiqueta superior */}
-                                    <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                        {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
+                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
+                                        <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
                                     </div>
-                                    
-                                    {/* Fila Inferior: Estado + Contador alineados */}
-                                    <div className="flex items-baseline justify-start w-full gap-4">
-                                        <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                            {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
+
+                                    <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
+                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
+                                            {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
                                         </div>
-                                        {/* Contador movido aquí dentro */}
-                                        <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
-                                            {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+
+                                        <div className="flex items-baseline justify-start w-full gap-4">
+                                            <div className="text-white text-sm font-medium font-sans leading-none uppercase">
+                                                {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
+                                            </div>
+                                            <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
+                                                {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
                                 </div>
                             );
                         })}
@@ -1131,99 +678,101 @@
                     </div>
 
                     <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
-                        <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
-                            
-                            <button 
-                                onClick={handleGenerateAsset} 
-                                // Se desactiva si está generando O si no hay internet
-                                disabled={isGenerating || !isOnline}
-                                className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <div className="w-5 h-5 flex items-center justify-center">
-                                    <img 
-                                        src={isGenerating ? ICONS.loader : ICONS.search} 
-                                        className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} 
+                        <div className="glass-panel p-4 md:p-6">
+                            <div className="flex items-center gap-2 md:gap-4 mb-3 md:mb-4 overflow-x-auto scrollbar-hide">
+                                {assetsInfo.map((asset, idx) => (
+                                    <div
+                                        key={asset.id}
+                                        onClick={() => setActiveTab(idx)}
+                                        className={`tab-item px-3 py-2 flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
+                                            activeTab === idx ? 'bg-white/10' : ''
+                                        }`}
+                                    >
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: asset.color }}></div>
+                                        <span className="text-white text-xs md:text-sm font-medium">{asset.name}</span>
+                                        <span className="text-white/40 text-xs">${priceData[idx].price.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-4">
+                                <div className="flex items-center gap-2 px-3 py-2 glass-button order-1 md:order-1">
+                                    <img src={ICONS.activity} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.6)' }} />
+                                    <div className="flex items-center gap-2">
+                                        {durations.map((dur, idx) => (
+                                            <div
+                                                key={dur}
+                                                onClick={() => setCurrentDurationIndex(idx)}
+                                                className={`px-2 py-1 rounded-lg text-xs cursor-pointer transition-all ${
+                                                    currentDurationIndex === idx ? 'bg-white/20 text-white' : 'text-white/40'
+                                                }`}
+                                            >
+                                                {dur}s
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 px-3 py-2 glass-button w-full md:w-auto order-3 md:order-2">
+                                    <img src={ICONS.minus} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.4)' }} />
+                                    <input 
+                                        type="range" 
+                                        min="20" 
+                                        max="500" 
+                                        value={580 - zoom}
+                                        onChange={(e) => { 
+                                            const val = Number(e.target.value); 
+                                            const invertedVal = 580 - val;
+                                            isUserInteractingRef.current = true; 
+                                            zoomTargetRef.current = invertedVal; 
+                                            setZoom(invertedVal); 
+                                        }} 
+                                        className="zoom-slider" 
                                     />
+                                    <img src={ICONS.plus} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.4)' }} />
                                 </div>
-                                <div className="flex flex-col items-start gap-0">
-                                    <div className="opacity-60 text-white text-[10px] font-normal uppercase">
-                                        {isMobile ? 'EXPLORACIÓN' : 'EXPLORAR'}
-                                    </div>
-                                    <div className="text-white text-sm font-normal uppercase whitespace-nowrap">
-                                        {!isOnline ? 'SIN RED' : (isGenerating ? 'BUSCANDO...' : 'NUEVO ACTIVO')}
-                                    </div>
+
+                                <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
+                                    <button 
+                                        onClick={() => executeTrade('BUY')} 
+                                        disabled={tradesDisabled || (buttonStates.buy.active && !isMobile)}
+                                        className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${(tradesDisabled || (buttonStates.buy.active && !isMobile)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
+                                        <div className="flex flex-col items-start gap-0 text-black">
+                                            <div className="opacity-60 text-[10px] font-normal">
+                                                {buttonStates.buy.active ? 'OPERACIÓN ABIERTA' : 'OPERAR COMPRA'}
+                                            </div>
+                                            <div className="text-sm font-medium flex items-baseline gap-2">
+                                                <span>{buttonStates.buy.active ? 'COMPRANDO...' : `BUY / ${currentDuration}s.`}</span>
+                                                {buttonStates.buy.active && (
+                                                    <span className="tabular-nums">{buttonStates.buy.timeRemaining.toFixed(1)}s</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => executeTrade('SELL')} 
+                                        disabled={tradesDisabled || (buttonStates.sell.active && !isMobile)}
+                                        className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${(tradesDisabled || (buttonStates.sell.active && !isMobile)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
+                                        <div className="flex flex-col items-start gap-0 text-black">
+                                            <div className="opacity-60 text-[10px] font-normal">
+                                                {buttonStates.sell.active ? 'OPERACIÓN ABIERTA' : 'OPERAR VENTA'}
+                                            </div>
+                                            <div className="text-sm font-medium flex items-baseline gap-2">
+                                                <span>{buttonStates.sell.active ? 'VENDIENDO...' : `SELL / ${currentDuration}s.`}</span>
+                                                {buttonStates.sell.active && (
+                                                    <span className="tabular-nums">{buttonStates.sell.timeRemaining.toFixed(1)}s</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
                                 </div>
-                            </button>
 
-                            {!isMobile && (
-                                <div 
-                                    className="h-16 px-6 flex items-center gap-4 order-2 md:order-4 cursor-pointer hover:opacity-80 transition-opacity" 
-                                    onClick={() => setAutopilot(!autopilot)}
-                                >
-                                    <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
-                                        <div className="toggle-knob"></div>
-                                    </div>
-                                    <div className="flex flex-col items-start gap-1">
-                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
-                                        <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-0 order-3 md:order-3">
-                                {/* Línea de fondo (Track) */}
-                                <div className="w-full h-[2px] bg-[#333] rounded-full absolute top-1/2 transform -translate-y-1/2"></div>
-                                
-                                {/* Indicador Visual (Knob/Barrita) */}
-                                <div 
-                                    className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                                    style={{ left: `${100 - sliderPercentage}%` }} 
-                                ></div>
-
-                                {/* Input invisible pero funcional (Invertido) */}
-                                <input 
-                                    type="range" 
-                                    min="80" 
-                                    max="500" 
-                                    value={580 - zoom} 
-                                    onChange={(e) => { 
-                                        const val = Number(e.target.value); 
-                                        // Invertimos: Mover a la derecha (valor alto) reduce el zoom numérico (Zoom In visual)
-                                        const invertedVal = 580 - val;
-                                        isUserInteractingRef.current = true; 
-                                        zoomTargetRef.current = invertedVal; 
-                                        setZoom(invertedVal); 
-                                    }} 
-                                    className="zoom-slider" 
-                                />
                             </div>
-
-                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
-                                <button 
-                                    onClick={() => executeTrade('BUY')} 
-                                    disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
-                                    <div className="flex flex-col items-start gap-0 text-black">
-                                        <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
-                                        <div className="text-sm font-medium">BUY / {currentDuration}s.</div>
-                                    </div>
-                                </button>
-                                
-                                <button 
-                                    onClick={() => executeTrade('SELL')} 
-                                    disabled={tradesDisabled}
-                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
-                                    <div className="flex flex-col items-start gap-0 text-black">
-                                        <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
-                                        <div className="text-sm font-medium">SELL / {currentDuration}s.</div>
-                                    </div>
-                                </button>
-                            </div>
-
                         </div>
                     </div>
                 </div>

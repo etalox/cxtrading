@@ -323,9 +323,8 @@ const MarketSim = () => {
             // --- Dynamic Candle Density Logic ---
             const zoomPct = (500 - zoomCurrentRef.current) / 420;
             let targetTicksPerCandle = 4;
-            if (zoomPct > 0.75) targetTicksPerCandle = 1;
-            else if (zoomPct > 0.50) targetTicksPerCandle = 2;
-            else if (zoomPct > 0.25) targetTicksPerCandle = 3;
+            if (zoomPct > 0.75) targetTicksPerCandle = 3;
+            else if (zoomPct < 0.25) targetTicksPerCandle = 5;
 
             const currentState = marketStatesRef.current[activeTab];
             if (currentState.ticksPerCandle !== targetTicksPerCandle) {

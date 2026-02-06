@@ -230,7 +230,7 @@ const MarketSim = () => {
         const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration, trend: trendDirection };
 
         const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias;
-        const confidence = sigmoid(rawSum);
+        const confidence = window.sigmoid(rawSum);
 
         ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures;
         setAiConfidence(confidence);
@@ -577,7 +577,7 @@ const MarketSim = () => {
                     expiredTrades.forEach(trade => {
                         const tradeState = marketStatesRef.current[trade.tabIndex];
                         const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
-                        if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
+                        if (trade.aiSnapshot) window.trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
                         if (trade.tabIndex === activeTab) {
                             const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
                             resultLabelsRef.current.push({

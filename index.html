@@ -188,7 +188,6 @@
             const [aiConfidence, setAiConfidence] = useState(0); 
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
             const [autopilot, setAutopilot] = useState(false);
-            const [convertingSignalId, setConvertingSignalId] = useState(null);
 
             useEffect(() => {
                 const hasActiveTrades = activeTradesUI.length > 0;
@@ -485,68 +484,30 @@
                 setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
             
-                        const executeTrade = (type, manualSignalId = null) => { 
+            const executeTrade = (type) => { 
                 if (!isOnline) return; 
                 const maxTrades = autopilot ? 1 : 4;
                 if (activeTradesRef.current.length >= maxTrades) return;
-                
-                // 1. BÚSQUEDA AUTOMÁTICA DE COINCIDENCIAS
-                // Si es un click manual (manualSignalId es null), miramos si hay una señal en pantalla que coincida
-                let targetSignalId = manualSignalId;
-
-                if (!targetSignalId) {
-                    // Buscamos la primera señal visible que sea del mismo tipo (BUY==BUY)
-                    const matchingSignal = notifications.find(n => n.type === 'SIGNAL' && n.signalType === type);
-                    if (matchingSignal) {
-                        targetSignalId = matchingSignal.id;
-                    }
-                }
-
-                // 2. LÓGICA DE TRANSICIÓN O LIMPIEZA
-                if (targetSignalId) {
-                    // Si encontramos una señal (manual o automática), iniciamos el Morphing
-                    setConvertingSignalId(targetSignalId);
-                    // Mantenemos SOLO la señal que se va a transformar
-                    setNotifications(prev => prev.filter(n => n.id === targetSignalId || n.type !== 'SIGNAL'));
-                    isNotificationVisible.current = true; 
-                } else {
-                    // Si no hay coincidencia, borramos las señales viejas normalmente
-                    setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
-                    isNotificationVisible.current = false; 
-                }
-
+                setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
+                isNotificationVisible.current = false; 
                 const state = marketStatesRef.current[activeTab]; 
                 const ks = kinematicsRef.current[activeTab];
                 const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
                 const now = Date.now(); 
                 const duration = state.tradeDuration || 10000;
-                
                 const newTrade = { 
                     id: Date.now() + Math.random(), type, entryPrice: state.visualValue, 
                     entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + duration, 
-                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab,
-                    // Vinculamos el trade a la señal encontrada (si la hubo)
-                    fromSignalId: targetSignalId 
+                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab 
                 }; 
-                
                 activeTradesRef.current.push(newTrade); 
                 setActiveTradesUI([...activeTradesRef.current]); 
                 setBalance(prev => prev - INVESTMENT_AMOUNT); 
-
-                // 3. LIMPIEZA RETARDADA (SOLO SI HUBO TRANSICIÓN)
-                if (targetSignalId) {
-                    setTimeout(() => {
-                        setNotifications(prev => prev.filter(n => n.id !== targetSignalId));
-                        setConvertingSignalId(null);
-                    }, 600); 
-                }
             };
 
             const handleNotificationClick = (notification) => {
-                // Pasamos el ID de la señal
-                if (notification.type === 'SIGNAL') { executeTrade(notification.signalType, notification.id); }
+                if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
             };
-
 
             // --- GESTIÓN DE CONEXIÓN A INTERNET ---
             useEffect(() => {
@@ -1024,111 +985,33 @@
                             </div>
                         )}
 
-                                                {/* --- NOTIFICACIONES (Con capacidad de Morphing) --- */}
                         {notifications.map(note => {
-                            const isMorphing = note.id === convertingSignalId;
-                            let morphTradeData = null;
-                            if (isMorphing) {
-                                morphTradeData = activeTradesRef.current.find(t => t.fromSignalId === note.id);
-                            }
+                            let iconSrc = ICONS.activityNeutral;
+                            let iconClass = "w-5 h-5";
+                            let iconStyle = {};
 
-                            // Si es Morphing y ya tenemos datos, usamos datos del trade. Si no, de la nota.
-                            const isBuy = morphTradeData ? (morphTradeData.type === 'BUY') : (note.signalType === 'BUY');
-                            
-                            // CLASES DINÁMICAS
-                            // Base: glass-panel y transición
-                            let baseClasses = "flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden animate-fade-in";
-                            
-                            // Dimensiones y Estilo
-                            let styleClasses = "";
-                            if (isMorphing) {
-                                // Estilo TRADE
-                                styleClasses = "h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] gap-[10px] border border-white/20 w-full md:w-auto";
-                            } else {
-                                // Estilo SEÑAL
-                                styleClasses = "h-16 pl-[5px] pr-6 glass-panel !rounded-[20px] gap-[10px] text-white/90 pointer-events-auto cursor-pointer hover:bg-white/10";
+                            if(note.type === 'SIGNAL') {
+                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
                             }
 
                             return (
                                 <div 
                                     key={note.id} 
-                                    onClick={() => !isMorphing && handleNotificationClick(note)} 
-                                    className={`${baseClasses} ${styleClasses}`}
+                                    onClick={() => handleNotificationClick(note)}
+                                    className={`glass-panel !bg-white/15 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                                 >
-                                    {/* CONTENIDO INTERNO CAMBIANTE */}
-                                    {isMorphing && morphTradeData ? (
-                                        <>
-                                            {/* --- CONTENIDO MODO TRADE --- */}
-                                            <div className={`w-12 h-12 ${isBuy ? 'bg-[#10B981] shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'bg-[#F43F5E] shadow-[0_0_20px_rgba(244,63,94,0.20)]'} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                                <img src={isBuy ? ICONS.trendingUp : ICONS.trendingDown} className="w-5 h-5 brightness-0" style={isBuy ? {} : { transform: 'scaleY(-1)' }} />
-                                            </div>
-                                            <div className="flex flex-col justify-center items-start gap-1.5 flex-1 min-w-[120px]">
-                                                <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none whitespace-nowrap">
-                                                    {isMobile ? 'OPERACIÓN ABIERTA' : assetsInfo[morphTradeData.tabIndex].name}
-                                                </div>
-                                                <div className="flex items-baseline justify-start w-full gap-4">
-                                                    <div className="text-white text-sm font-medium font-sans leading-none uppercase whitespace-nowrap">
-                                                        {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
-                                                    </div>
-                                                    <div className="text-white text-sm font-medium font-sans leading-none tabular-nums opacity-80">
-                                                        10.0s
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {/* --- CONTENIDO MODO SEÑAL --- */}
-                                            <div className="w-12 h-12 border border-white/20 rounded-[15px] flex items-center justify-center shrink-0">
-                                                <img 
-                                                    src={note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss} 
-                                                    className="w-5 h-5 animate-pulse" 
-                                                    style={{ 
-                                                        filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', 
-                                                        transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' 
-                                                    }} 
-                                                />
-                                            </div>
-                                            <div className="flex flex-col justify-center items-start gap-1 min-w-[100px]">
-                                                <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                                    {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
-                                                </div>
-                                                <div className="text-sm font-medium whitespace-nowrap">
-                                                    {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            );
-                        })}
 
-                        {/* --- LISTA DE TRADES REALES --- */}
-                        {activeTradesUI.map(trade => {if (trade.fromSignalId && trade.fromSignalId === convertingSignalId) {return null;}
-
-                            const tradeAsset = assetsInfo[trade.tabIndex].name;
-                            const isBuy = trade.type === 'BUY';
-                            const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
-                            const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
-                            const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                            const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
-
-                            return (
-                                <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
+                                    <div className="w-12 h-12 border border-white/50 rounded-[15px] flex items-center justify-center shrink-0">
+                                        <img src={iconSrc} className={`${iconClass} animate-pulse`} style={{filter: 'brightness(0) invert(1)'}}/>
                                     </div>
-                                    <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                            {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
+
+                                    <div className="flex flex-col justify-center items-start gap-1">
+                                        <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
+                                            {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
                                         </div>
-                                        <div className="flex items-baseline justify-start w-full gap-4">
-                                            <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                                {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
-                                            </div>
-                                            <div className="text-white text-sm font-medium font-sans leading-none tabular-nums opacity-80">
-                                                {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
-                                            </div>
+                                        <div className="text-sm font-medium">
+                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
                                         </div>
                                     </div>
                                 </div>

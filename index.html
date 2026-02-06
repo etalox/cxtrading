@@ -1026,91 +1026,85 @@
 
                                                 {/* --- NOTIFICACIONES (Con capacidad de Morphing) --- */}
                         {notifications.map(note => {
-                            // Verificamos si esta nota se está convirtiendo
                             const isMorphing = note.id === convertingSignalId;
-                            
-                            // Si se está convirtiendo, buscamos los datos del trade real para mostrarlos
-                            // simulando que la notificación YA ES el trade
                             let morphTradeData = null;
                             if (isMorphing) {
                                 morphTradeData = activeTradesRef.current.find(t => t.fromSignalId === note.id);
                             }
 
-                            // Estilos base
-                            let containerClass = "glass-panel px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/90 transition-all duration-500 ease-out overflow-hidden";
+                            // Si es Morphing y ya tenemos datos, usamos datos del trade. Si no, de la nota.
+                            const isBuy = morphTradeData ? (morphTradeData.type === 'BUY') : (note.signalType === 'BUY');
                             
-                            // Si es Morphing, cambiamos ESTILOS para parecerse a una Operación Abierta
-                            // Usamos las mismas clases que el bloque de Trade
+                            // CLASES DINÁMICAS
+                            // Base: glass-panel y transición
+                            let baseClasses = "flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden animate-fade-in";
+                            
+                            // Dimensiones y Estilo
+                            let styleClasses = "";
                             if (isMorphing) {
-                                containerClass = "h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in transition-all duration-500 border border-white/20";
-                            } else if (note.type === 'SIGNAL') {
-                                containerClass = "glass-panel !rounded-[20px] pl-[5px] pr-6 h-16 flex items-center justify-center gap-[10px] animate-fade-in text-white/90 pointer-events-auto cursor-pointer hover:bg-white/10 transition-all";
-                            }
-
-                            // CONTENIDO: Si es Morphing, mostramos contenido de Trade. Si no, de Notificación.
-                            if (isMorphing && morphTradeData) {
-                                // --- RENDERIZADO COMO TRADE (DURANTE TRANSICIÓN) ---
-                                const isBuy = morphTradeData.type === 'BUY';
-                                const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
-                                const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
-                                const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                                const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
-                                const tradeAsset = assetsInfo[morphTradeData.tabIndex].name;
-
-                                return (
-                                    <div key={note.id} className={containerClass}>
-                                        <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                            <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
-                                        </div>
-                                        <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
-                                            <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                                 {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
-                                            </div>
-                                            <div className="flex items-baseline justify-start w-full gap-4">
-                                                <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                                    {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
-                                                </div>
-                                                <div className="text-white text-sm font-medium font-sans leading-none tabular-nums opacity-80">
-                                                    10.0s
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // --- RENDERIZADO NORMAL DE NOTIFICACIÓN ---
-                            let iconSrc = ICONS.activityNeutral;
-                            let iconClass = "w-5 h-5";
-                            let iconStyle = {};
-                            if(note.type === 'SIGNAL') {
-                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
-                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
+                                // Estilo TRADE
+                                styleClasses = "h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] gap-[10px] border border-white/20 w-full md:w-auto";
+                            } else {
+                                // Estilo SEÑAL
+                                styleClasses = "h-16 pl-[5px] pr-6 glass-panel !rounded-[20px] gap-[10px] text-white/90 pointer-events-auto cursor-pointer hover:bg-white/10";
                             }
 
                             return (
-                                <div key={note.id} onClick={() => handleNotificationClick(note)} className={containerClass}>
-                                    <div className="w-12 h-12 border border-white/20 rounded-[15px] flex items-center justify-center shrink-0">
-                                        <img src={iconSrc} className={`${iconClass} ${note.type==='SIGNAL'?'animate-pulse':''}`} style={iconStyle} />
-                                    </div>
-                                    <div className="flex flex-col justify-center items-start gap-1">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                            {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
-                                        </div>
-                                        <div className="text-sm font-medium">
-                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
-                                        </div>
-                                    </div>
+                                <div 
+                                    key={note.id} 
+                                    onClick={() => !isMorphing && handleNotificationClick(note)} 
+                                    className={`${baseClasses} ${styleClasses}`}
+                                >
+                                    {/* CONTENIDO INTERNO CAMBIANTE */}
+                                    {isMorphing && morphTradeData ? (
+                                        <>
+                                            {/* --- CONTENIDO MODO TRADE --- */}
+                                            <div className={`w-12 h-12 ${isBuy ? 'bg-[#10B981] shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'bg-[#F43F5E] shadow-[0_0_20px_rgba(244,63,94,0.20)]'} rounded-[15px] flex items-center justify-center shrink-0`}>
+                                                <img src={isBuy ? ICONS.trendingUp : ICONS.trendingDown} className="w-5 h-5 brightness-0" style={isBuy ? {} : { transform: 'scaleY(-1)' }} />
+                                            </div>
+                                            <div className="flex flex-col justify-center items-start gap-1.5 flex-1 min-w-[120px]">
+                                                <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none whitespace-nowrap">
+                                                    {isMobile ? 'OPERACIÓN ABIERTA' : assetsInfo[morphTradeData.tabIndex].name}
+                                                </div>
+                                                <div className="flex items-baseline justify-start w-full gap-4">
+                                                    <div className="text-white text-sm font-medium font-sans leading-none uppercase whitespace-nowrap">
+                                                        {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
+                                                    </div>
+                                                    <div className="text-white text-sm font-medium font-sans leading-none tabular-nums opacity-80">
+                                                        10.0s
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* --- CONTENIDO MODO SEÑAL --- */}
+                                            <div className="w-12 h-12 border border-white/20 rounded-[15px] flex items-center justify-center shrink-0">
+                                                <img 
+                                                    src={note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss} 
+                                                    className="w-5 h-5 animate-pulse" 
+                                                    style={{ 
+                                                        filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', 
+                                                        transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' 
+                                                    }} 
+                                                />
+                                            </div>
+                                            <div className="flex flex-col justify-center items-start gap-1 min-w-[100px]">
+                                                <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
+                                                    {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
+                                                </div>
+                                                <div className="text-sm font-medium whitespace-nowrap">
+                                                    {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             );
                         })}
 
                         {/* --- LISTA DE TRADES REALES --- */}
-                        {activeTradesUI.map(trade => {
-                            // TRUCO: Si este trade viene de una señal que AÚN se está convirtiendo,
-                            // no lo renderizamos aquí para evitar duplicados visuales.
-                            // La "notificación morphing" está ocupando su lugar visualmente.
-                            if (trade.fromSignalId && trade.fromSignalId === convertingSignalId) return null;
+                        {activeTradesUI.map(trade => {if (trade.fromSignalId && trade.fromSignalId === convertingSignalId) {return null;}
 
                             const tradeAsset = assetsInfo[trade.tabIndex].name;
                             const isBuy = trade.type === 'BUY';

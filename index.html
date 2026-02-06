@@ -485,7 +485,7 @@
                 setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
             };
             
-            const executeTrade = (type, manualSignalId = null) => { 
+                        const executeTrade = (type, manualSignalId = null) => { 
                 if (!isOnline) return; 
                 const maxTrades = autopilot ? 1 : 4;
                 if (activeTradesRef.current.length >= maxTrades) return;
@@ -539,35 +539,6 @@
                         setNotifications(prev => prev.filter(n => n.id !== targetSignalId));
                         setConvertingSignalId(null);
                     }, 600); 
-                }
-            };
-
-
-                const state = marketStatesRef.current[activeTab]; 
-                const ks = kinematicsRef.current[activeTab];
-                const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
-                const now = Date.now(); 
-                const duration = state.tradeDuration || 10000;
-                
-                const newTrade = { 
-                    id: Date.now() + Math.random(), type, entryPrice: state.visualValue, 
-                    entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + duration, 
-                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab,
-                    fromSignalId: fromSignalId // Guardamos el origen para linkearlo
-                }; 
-                
-                activeTradesRef.current.push(newTrade); 
-                setActiveTradesUI([...activeTradesRef.current]); 
-                setBalance(prev => prev - INVESTMENT_AMOUNT); 
-
-                // Si hubo transición, programamos la limpieza final
-                if (fromSignalId) {
-                    setTimeout(() => {
-                        // 1. Borramos la notificación (que actuaba como doble)
-                        setNotifications(prev => prev.filter(n => n.id !== fromSignalId));
-                        // 2. Liberamos el estado de conversión (esto hará visible el trade real)
-                        setConvertingSignalId(null);
-                    }, 600); // Duración de la transición visual
                 }
             };
 

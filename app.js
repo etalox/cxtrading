@@ -62,6 +62,12 @@ const MarketSim = () => {
     const [aiLearnedCount, setAiLearnedCount] = useState(0);
     const [autopilot, setAutopilot] = useState(false);
 
+    // Button animation and touch tracking
+    const [buyButtonOpacity, setBuyButtonOpacity] = useState(1);
+    const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
+    const touchedButtonsRef = useRef(new Set());
+    const lastTradeTimeRef = useRef({ BUY: 0, SELL: 0 });
+
     useEffect(() => {
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
         updateMobile();
@@ -164,6 +170,16 @@ const MarketSim = () => {
         if (!isOnline) return;
         const maxTrades = autopilot ? 1 : 4;
         if (activeTradesRef.current.length >= maxTrades) return;
+
+        // Button Click Animation: 50% opacity for 120ms, then back to 100% over 400ms
+        if (type === 'BUY') {
+            setBuyButtonOpacity(0.5);
+            setTimeout(() => setBuyButtonOpacity(1), 120);
+        } else {
+            setSellButtonOpacity(0.5);
+            setTimeout(() => setSellButtonOpacity(1), 120);
+        }
+
         setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
         isNotificationVisible.current = false;
         const state = marketStatesRef.current[activeTab];
@@ -181,6 +197,21 @@ const MarketSim = () => {
         activeTradesRef.current.push(newTrade);
         setActiveTradesUI([...activeTradesRef.current]);
         setBalance(prev => prev - INVESTMENT_AMOUNT);
+    };
+
+    // Mobile touch handlers to prevent simultaneous button presses
+    const handleTouchStart = (type) => {
+        if (!isMobileRef.current) return;
+        touchedButtonsRef.current.add(type);
+    };
+
+    const handleTouchEnd = (type) => {
+        if (!isMobileRef.current) return;
+        const touched = touchedButtonsRef.current;
+        if (touched.size === 1 && touched.has(type)) {
+            executeTrade(type);
+        }
+        touched.clear();
     };
 
     // Helper to gather context for modules
@@ -390,6 +421,7 @@ const MarketSim = () => {
             if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
                 setCurrentPriceUI(state.visualValue);
                 setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
+                if (activeTradesRef.current.length > 0) setActiveTradesUI([...activeTradesRef.current]);
                 lastUIUpdateRef.current = now;
             }
 
@@ -531,42 +563,7 @@ const MarketSim = () => {
                     );
                 })}
 
-                {activeTradesUI.map(trade => {
-                    const tradeAsset = assetsInfo[trade.tabIndex].name;
-                    const isBuy = trade.type === 'BUY';
-                    const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
-                    const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
-                    const icon = isBuy ? window.ICONS.trendingUp : window.ICONS.trendingDown;
-                    const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
 
-                    return (
-                        <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                            {/* Icono */}
-                            <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
-                            </div>
-
-                            { }
-                            <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
-                                {/* Etiqueta superior */}
-                                <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                    {isMobile ? 'OPERACIÃ“N ABIERTA' : tradeAsset}
-                                </div>
-
-                                { }
-                                <div className="flex items-baseline justify-start w-full gap-4">
-                                    <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                        {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
-                                    </div>
-                                    { }
-                                    <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
-                                        {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
             </div>
 
             <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
@@ -646,29 +643,64 @@ const MarketSim = () => {
                     </div>
 
                     <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
-                        <button
-                            onClick={() => executeTrade('BUY')}
-                            disabled={tradesDisabled}
-                            className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
-                            <div className="flex flex-col items-start gap-0 text-black">
-                                <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
-                                <div className="text-sm font-medium">BUY / {currentDuration}s.</div>
-                            </div>
-                        </button>
+                        {(() => {
+                            const buyTrades = activeTradesUI.filter(t => t.type === 'BUY');
+                            const sellTrades = activeTradesUI.filter(t => t.type === 'SELL');
 
-                        <button
-                            onClick={() => executeTrade('SELL')}
-                            disabled={tradesDisabled}
-                            className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
-                            <div className="flex flex-col items-start gap-0 text-black">
-                                <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
-                                <div className="text-sm font-medium">SELL / {currentDuration}s.</div>
-                            </div>
-                        </button>
+                            const mostRecentBuy = buyTrades.length > 0 ? buyTrades.reduce((a, b) => a.expiryTime > b.expiryTime ? a : b) : null;
+                            const mostRecentSell = sellTrades.length > 0 ? sellTrades.reduce((a, b) => a.expiryTime > b.expiryTime ? a : b) : null;
+
+                            const buyRemaining = mostRecentBuy ? Math.max(0, (mostRecentBuy.expiryTime - Date.now()) / 1000) : 0;
+                            const sellRemaining = mostRecentSell ? Math.max(0, (mostRecentSell.expiryTime - Date.now()) / 1000) : 0;
+
+                            return (
+                                <>
+                                    <button
+                                        onClick={() => !isMobileRef.current && executeTrade('BUY')}
+                                        onTouchStart={() => handleTouchStart('BUY')}
+                                        onTouchEnd={() => handleTouchEnd('BUY')}
+                                        disabled={tradesDisabled}
+                                        style={{
+                                            opacity: tradesDisabled ? 0.5 : buyButtonOpacity,
+                                            transition: buyButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease'
+                                        }}
+                                        className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                                    >
+                                        <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
+                                        <div className="flex flex-col items-start gap-0 text-black">
+                                            <div className="opacity-60 text-[10px] font-normal">
+                                                {buyRemaining > 0 ? 'OPERACIÓN ABIERTA' : 'OPERAR COMPRA'}
+                                            </div>
+                                            <div className="text-sm font-medium">
+                                                {buyRemaining > 0 ? `COMPRANDO... ${buyRemaining.toFixed(1)}s` : `BUY / ${currentDuration}s.`}
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => !isMobileRef.current && executeTrade('SELL')}
+                                        onTouchStart={() => handleTouchStart('SELL')}
+                                        onTouchEnd={() => handleTouchEnd('SELL')}
+                                        disabled={tradesDisabled}
+                                        style={{
+                                            opacity: tradesDisabled ? 0.5 : sellButtonOpacity,
+                                            transition: sellButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease'
+                                        }}
+                                        className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                                    >
+                                        <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
+                                        <div className="flex flex-col items-start gap-0 text-black">
+                                            <div className="opacity-60 text-[10px] font-normal">
+                                                {sellRemaining > 0 ? 'OPERACIÓN ABIERTA' : 'OPERAR VENTA'}
+                                            </div>
+                                            <div className="text-sm font-medium">
+                                                {sellRemaining > 0 ? `VENDIENDO... ${sellRemaining.toFixed(1)}s` : `SELL / ${currentDuration}s.`}
+                                            </div>
+                                        </div>
+                                    </button>
+                                </>
+                            );
+                        })()}
                     </div>
 
                 </div>

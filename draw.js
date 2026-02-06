@@ -54,6 +54,8 @@ window.draw = {
 
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
             const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth + shift;
+            // Instant version without smoothing for trade markers
+            const getXInstant = (index) => anchorX - (state.targetScroll - index) * candleWidth + shift;
 
             let minPrice = Infinity, maxPrice = -Infinity;
             allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
@@ -147,12 +149,12 @@ window.draw = {
                 const elapsedTicks = elapsedSeconds * 2; // TICK_RATE 2
                 const entryCandleOffset = elapsedTicks / state.ticksPerCandle;
                 const entryCandleIndex = currentCandleIndex - entryCandleOffset;
-                const xEntry = getX(entryCandleIndex);
+                const xEntry = getXInstant(entryCandleIndex);
 
                 const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
                 const remainingTicks = remainingSeconds * 2; // TICK_RATE 2
                 const expireCandleIndex = currentCandleIndex + (remainingTicks / state.ticksPerCandle);
-                const xExpire = getX(expireCandleIndex);
+                const xExpire = getXInstant(expireCandleIndex);
 
                 const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
                 context.strokeStyle = tradeColor;

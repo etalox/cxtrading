@@ -174,6 +174,7 @@ const MarketSim = () => {
         const newTrade = {
             id: Date.now() + Math.random(), type, entryPrice: state.visualValue,
             entryIndex: currentPreciseIndex, entryTickIndex: state.allTicks.length,
+            entryCandleIndex: currentPreciseIndex,
             startTime: now, expiryTime: now + duration,
             amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab
         };
@@ -372,6 +373,7 @@ const MarketSim = () => {
                             resultLabelsRef.current.push({
                                 id: Date.now() + Math.random(), xIndex: currentPreciseIndex,
                                 xTickIndex: tradeState.allTicks.length,
+                                xCandleIndex: currentPreciseIndex,
                                 price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount,
                                 timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS'
                             });

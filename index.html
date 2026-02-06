@@ -72,6 +72,14 @@
             animation: blink-soft 2s infinite;
         }
 
+        .toggle-switch:not(.active):hover {
+            background: rgba(255,255,255,0.3); /* Un poco más claro */
+        }
+        
+        .toggle-switch.active:hover {
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
         .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
         .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
         .cursor-wait { cursor: wait; }

@@ -24,7 +24,11 @@ window.draw = {
 
             ctx.zoomCurrentRef.current += (ctx.zoomTargetRef.current - ctx.zoomCurrentRef.current) * SMOOTHING;
             if (Math.abs(ctx.zoomTargetRef.current - ctx.zoomCurrentRef.current) < 0.05) ctx.zoomCurrentRef.current = ctx.zoomTargetRef.current;
-            const candleWidth = width / ctx.zoomCurrentRef.current;
+
+            // Fix: Scale candle width relative to density (ticksPerCandle).
+            // Base assumption: 4 ticks/candle is "standard" width at a given zoom.
+            // If we have 1 tick/candle (higher resolution), width should be 1/4th.
+            const candleWidth = (width / ctx.zoomCurrentRef.current) * (state.ticksPerCandle / 4);
 
             let targetAnchorPercent = 0.75;
             if (activeTrades.length > 0) {
@@ -35,7 +39,15 @@ window.draw = {
             if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
             state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * SMOOTHING;
             const anchorX = width * state.currentAnchor;
-            const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
+
+            // Fix: Center alignment shift.
+            // A candle of N ticks represents time [t, t+N]. Its center is t + N/2.
+            // If we draw it at 't', it looks left-aligned compared to higher-res candles.
+            // Shift = ((N - 1) / 2) * UnitWidth.
+            // UnitWidth = candleWidth / state.ticksPerCandle.
+            // So Shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+            const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+            const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth + shift;
 
             let minPrice = Infinity, maxPrice = -Infinity;
             allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });

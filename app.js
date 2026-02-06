@@ -241,19 +241,6 @@ const MarketSim = () => {
         const handleOnline = () => {
             setIsOnline(true);
             setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
-
-            const now = Date.now();
-            const timeMissed = now - lastLogicTimeRef.current;
-            const LOGIC_RATE_MS = 1000 / TICK_RATE;
-            const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-
-            if (ticksMissed > 0 && ticksMissed < 10000) {
-                for (let i = 0; i < ticksMissed; i++) {
-                    // We need to call logic for all tabs? No, the original updated all
-                    // runMarketLogic() calls processMarketLogic for 0,1,2
-                }
-            }
-            lastLogicTimeRef.current = now;
         };
 
         const handleOffline = () => {
@@ -274,11 +261,19 @@ const MarketSim = () => {
         let animationId;
         const LOGIC_RATE_MS = 1000 / TICK_RATE;
 
-        const runMarketLogic = () => {
+        const runMarketLogic = (forceSnap) => {
             const ctx = getContext();
-            window.generator.processMarketLogic(0, ctx); window.generator.updateVisualCandleLogic(0, ctx);
-            window.generator.processMarketLogic(1, ctx); window.generator.updateVisualCandleLogic(1, ctx);
-            window.generator.processMarketLogic(2, ctx); window.generator.updateVisualCandleLogic(2, ctx);
+            window.generator.processMarketLogic(0, ctx);
+            if (forceSnap) { ctx.marketStatesRef.current[0].visualValue = ctx.marketStatesRef.current[0].currentValue; }
+            window.generator.updateVisualCandleLogic(0, ctx);
+
+            window.generator.processMarketLogic(1, ctx);
+            if (forceSnap) { ctx.marketStatesRef.current[1].visualValue = ctx.marketStatesRef.current[1].currentValue; }
+            window.generator.updateVisualCandleLogic(1, ctx);
+
+            window.generator.processMarketLogic(2, ctx);
+            if (forceSnap) { ctx.marketStatesRef.current[2].visualValue = ctx.marketStatesRef.current[2].currentValue; }
+            window.generator.updateVisualCandleLogic(2, ctx);
 
             const state = marketStatesRef.current[activeTab];
             const ks = kinematicsRef.current[activeTab];
@@ -301,40 +296,13 @@ const MarketSim = () => {
             }
         };
 
-        const performCatchUp = () => {
-            const now = Date.now();
-            const timeMissed = now - lastLogicTimeRef.current;
-            const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-
-            if (ticksMissed > 0 && ticksMissed < 10000) {
-                for (let i = 0; i < ticksMissed; i++) {
-                    runMarketLogic();
-                }
-                [0, 1, 2].forEach(idx => {
-                    const s = marketStatesRef.current[idx];
-                    s.targetScroll = s.candles.length;
-                    s.scrollOffset = s.candles.length;
-                    s.visualValue = s.currentValue;
-                });
-                lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
-            } else if (ticksMissed >= 10000) {
-                lastLogicTimeRef.current = now;
-            }
-        };
-
         const handleVisibilityChange = () => {
             isTabVisibleRef.current = !document.hidden;
-            if (isTabVisibleRef.current && navigator.onLine) {
-                performCatchUp();
-            }
         };
 
         const handleOnline = () => {
             setIsOnline(true);
             setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
-            if (isTabVisibleRef.current) {
-                performCatchUp();
-            }
         };
 
         const handleOffline = () => {
@@ -351,12 +319,45 @@ const MarketSim = () => {
             const now = Date.now();
             if (!navigator.onLine || !isTabVisibleRef.current) return;
             const deltaTime = now - lastLogicTimeRef.current;
+
+            // --- Dynamic Candle Density Logic ---
+            const zoomPct = (500 - zoomCurrentRef.current) / 420;
+            let targetTicksPerCandle = 4;
+            if (zoomPct > 0.75) targetTicksPerCandle = 1;
+            else if (zoomPct > 0.50) targetTicksPerCandle = 2;
+            else if (zoomPct > 0.25) targetTicksPerCandle = 3;
+
+            const currentState = marketStatesRef.current[activeTab];
+            if (currentState.ticksPerCandle !== targetTicksPerCandle) {
+                const ctx = getContext();
+                [0, 1, 2].forEach(idx => {
+                    const s = marketStatesRef.current[idx];
+                    s.ticksPerCandle = targetTicksPerCandle;
+                    if (window.generator.rebuildCandles) {
+                        window.generator.rebuildCandles(idx, ctx);
+                    }
+                });
+            }
+            // -------------------------------------
+
             if (deltaTime >= LOGIC_RATE_MS) {
                 const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
-                const safeTicks = Math.min(ticksToProcess, 10);
+                const MAX_TICKS_PER_FRAME = 20;
+                const safeTicks = Math.min(ticksToProcess, MAX_TICKS_PER_FRAME);
+                const isCatchingUp = safeTicks > 1;
+
                 for (let i = 0; i < safeTicks; i++) {
-                    runMarketLogic();
+                    runMarketLogic(isCatchingUp);
                 }
+
+                if (isCatchingUp) {
+                    [0, 1, 2].forEach(idx => {
+                        const s = marketStatesRef.current[idx];
+                        s.targetScroll = s.candles.length;
+                        s.scrollOffset = s.candles.length;
+                    });
+                }
+
                 lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;
                 const realNow = Date.now();
                 const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
@@ -402,7 +403,7 @@ const MarketSim = () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, [zoom, addNotification, activeTab, autopilot]); // Depend on args to update ctx closures
+    }, [zoom, addNotification, activeTab, autopilot]);
 
     useEffect(() => {
         const container = containerRef.current;

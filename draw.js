@@ -80,9 +80,7 @@ window.draw = {
             const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
             const currentY = getY(state.visualValue);
 
-            // Smooth the price label Y position
-            if (typeof state.visualPriceLabelY === 'undefined') state.visualPriceLabelY = currentY;
-            state.visualPriceLabelY += (currentY - state.visualPriceLabelY) * 0.15;
+
 
             context.strokeStyle = '#222';
             context.setLineDash([4, 4]);
@@ -203,11 +201,11 @@ window.draw = {
             });
             context.globalAlpha = 1;
 
-            // Gray price label: Fixed X at edge of screen, smoothed Y
+            // Gray price label: Fixed X at edge of screen
             const isSmallScreen = width < 768;
             const labelX = isSmallScreen ? 0 : width - 100;
             const textX = isSmallScreen ? 50 : width - 50;
-            const labelY = state.visualPriceLabelY;
+            const labelY = currentY;
             context.fillStyle = '#111';
             context.fillRect(labelX, labelY - 10, 100, 20);
             context.fillStyle = '#fff';

@@ -568,11 +568,15 @@
                 document.addEventListener("visibilitychange", handleVisibilityChange);
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
-
-                const loop = () => {
-                    animationId = requestAnimationFrame(loop);      
+                
+                const loopRef = useRef();
+                loopRef.current = () => {
+                    animationId = requestAnimationFrame(loopRef.current);      
                     const now = Date.now();
-                    if (!navigator.onLine || !isTabVisibleRef.current) return;
+                    if (!navigator.onLine || !isTabVisibleRef.current) {
+                        animationId = requestAnimationFrame(loop);
+                        return;
+                    }
                     const deltaTime = now - lastLogicTimeRef.current;
                     if (deltaTime >= LOGIC_RATE_MS) {
                         const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
@@ -581,7 +585,8 @@
                             runMarketLogic();}
                         lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;    
                         const realNow = Date.now();
-                        const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
+                        const currentTrades = [...activeTradesRef.current]; // Copiar array
+                        const expiredTrades = currentTrades.filter(t => realNow >= t.expiryTime);
                         if (expiredTrades.length > 0) {
                             let totalPayout = 0;
                             expiredTrades.forEach(trade => {
@@ -598,9 +603,9 @@
                                 }
                                 if (isWin) { totalPayout += trade.amount * 1.85; }
                             });
-                            activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
-                            setActiveTradesUI([...activeTradesRef.current]);
-                            if (totalPayout > 0) setBalance(b => b + totalPayout);
+                            const remainingTrades = currentTrades.filter(t => realNow < t.expiryTime);
+                            activeTradesRef.current = remainingTrades;
+                            setActiveTradesUI([...remainingTrades]);
                         }
                     }
 
@@ -792,7 +797,7 @@
                 };
                 
                 lastLogicTimeRef.current = Date.now();
-                loop();
+                loopRef.current();
 
                 return () => {
                     cancelAnimationFrame(animationId);
@@ -800,7 +805,7 @@
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
                 };
-            }, [zoom, addNotification, activeTab, autopilot]);
+            }, [addNotification]);
 
             useEffect(() => {
                 const container = containerRef.current;

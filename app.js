@@ -1,0 +1,1074 @@
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        const ICONS = {
+            search: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/search.png',
+            loader: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/loader.png',
+            trendingUp: './svg/up.svg',
+            trendingDown: './svg/up.svg',
+            wifiOff: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/wifiOff.png',
+            activityWin: './svg/up.svg',
+            activityLoss: './svg/up.svg',
+            activityNeutral: 'https://raw.githubusercontent.com/etalox/cxtrading/main/png/neutral.png',
+        };
+
+        const MATERIALS = ["PLATA", "BRONZE", "IRON", "COBRE", "LITIUM", "ORE", "RODIUM", "X"];
+        const ADJECTIVES = ["AIR", "01", "02", "03", "04", "05", "10", "15", "20", "25", "50", "60", "70", "80", "90", "99", "ALPHA", "BETA", "GAMMA", "DELTA", "OMEGA"];
+
+        const MarketSim = () => {
+            const isMobile = window.innerWidth < 768;
+            const INITIAL_ZOOM = isMobile ? 160 : 320;
+            const isMobileRef = useRef(isMobile);
+            
+            const [activeTab, setActiveTab] = useState(0); 
+            const [assetsInfo, setAssetsInfo] = useState([
+                { name: "INIT 01", price: 1000, change: 0 },
+                { name: "INIT 02", price: 1000, change: 0 },
+                { name: "INIT 03", price: 1000, change: 0 }
+            ]);
+            
+            const [balance, setBalance] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('cx_balance');
+                    return saved ? parseFloat(saved) : 100000;
+                } catch (e) { return 100000; }
+            });
+            useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
+
+            const assetHistoryRef = useRef([]);
+
+            const createEmptyState = () => ({
+                visualTicks: [], candles: [], longTermTicks: [], currentValue: 1000, visualValue: 1000, 
+                lastDirection: 1, patternState: 'NORMAL', ticksSincePatternChange: 0, nextPatternSwitchTick: 240, 
+                structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30, 
+                currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50, 
+                ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0, 
+                currentAnchor: 0.75, tradeDuration: 10000,
+                dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
+                stepBuffer: 0,
+                initialized: false,
+                visualMinPrice: undefined, visualMaxPrice: undefined
+            });
+
+            const marketStatesRef = useRef([createEmptyState(), createEmptyState(), createEmptyState()]);
+            const tickHistoriesRef = useRef([[], [], []]);
+            const kinematicsRef = useRef([
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
+                { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
+            ]);
+
+            const lastLogicTimeRef = useRef(Date.now());
+            const isTabVisibleRef = useRef(true);
+            const isCatchingUpRef = useRef(false);
+            const pendingTicksRef = useRef(0);
+
+            useEffect(() => {
+                const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
+                updateMobile();
+                window.addEventListener('resize', updateMobile);
+                
+                const handleVisibilityChange = () => {
+                    if (document.hidden) {
+                        isTabVisibleRef.current = false;
+                    } else {
+                        isTabVisibleRef.current = true;
+                    }
+                };
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
+                const container = containerRef.current;
+                if (!container) return; 
+                
+                const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
+                const onWheel = (e) => {
+                    if (isInteractive(e.target)) return;
+                    e.preventDefault();
+                    isUserInteractingRef.current = true;
+                    const delta = -e.deltaY;
+                    const factor = delta > 0 ? 0.94 : 1.06;
+                    const newTarget = Math.max(80, Math.min(500, zoomTargetRef.current * factor));
+                    zoomTargetRef.current = newTarget;
+                    setZoom(newTarget);
+                };
+                let touchActive = false;
+                const onTouchStart = (e) => {
+                    if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
+                };
+                const onTouchMove = (e) => {
+                    if (!touchActive) return;
+                    if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
+                        if (isInteractive(lastTouchTargetRef.current)) return;
+                        e.preventDefault();
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        const dist = Math.hypot(dx, dy);
+                        const ratio = (pinchStartRef.current || dist) / dist;
+                        pinchStartRef.current = dist;
+                        isUserInteractingRef.current = true;
+                        const newTarget = Math.max(80, Math.min(500, Math.round(zoomTargetRef.current * ratio)));
+                        zoomTargetRef.current = newTarget;
+                        setZoom(newTarget);
+                    }
+                };
+                const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
+                container.addEventListener('wheel', onWheel, { passive: false });
+                container.addEventListener('touchstart', onTouchStart, { passive: false });
+                container.addEventListener('touchmove', onTouchMove, { passive: false });
+                container.addEventListener('touchend', onTouchEnd);
+                return () => { 
+                    window.removeEventListener('resize', updateMobile); 
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    container.removeEventListener('wheel', onWheel); 
+                    container.removeEventListener('touchstart', onTouchStart); 
+                    container.removeEventListener('touchmove', onTouchMove); 
+                    container.removeEventListener('touchend', onTouchEnd); 
+                };
+            }, []);
+
+            const TICK_RATE = 2; const INVESTMENT_AMOUNT = 50; const UI_UPDATE_RATE_MS = 125; const TICK_HISTORY_LIMIT = 100;
+            const DURATIONS = [5000, 10000, 15000, 30000];
+
+            const [zoom, setZoom] = useState(INITIAL_ZOOM);
+            const zoomTargetRef = useRef(INITIAL_ZOOM);
+            const zoomCurrentRef = useRef(INITIAL_ZOOM);
+            const preTradeZoomRef = useRef(null);
+            const isUserInteractingRef = useRef(false);
+ 
+            const [activeTradesUI, setActiveTradesUI] = useState([]); 
+            const [notifications, setNotifications] = useState([]); 
+            const [currentPriceUI, setCurrentPriceUI] = useState(15868.30); 
+            const [isGenerating, setIsGenerating] = useState(false); 
+            const [currentDuration, setCurrentDuration] = useState(10); 
+            const [isOnline, setIsOnline] = useState(navigator.onLine); 
+            const [aiConfidence, setAiConfidence] = useState(0); 
+            const [aiLearnedCount, setAiLearnedCount] = useState(0);
+            const [autopilot, setAutopilot] = useState(false);
+
+            useEffect(() => {
+                const hasActiveTrades = activeTradesUI.length > 0;
+                if (hasActiveTrades) {
+                    if (zoomTargetRef.current > 200) {
+                        preTradeZoomRef.current = zoomTargetRef.current;
+                        isUserInteractingRef.current = false;
+                        zoomTargetRef.current = 160;
+                        setZoom(160);
+                    }
+                } else {
+                    if (preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
+                        zoomTargetRef.current = preTradeZoomRef.current;
+                        setZoom(preTradeZoomRef.current);
+                        preTradeZoomRef.current = null;
+                    }
+                }
+            }, [activeTradesUI.length]);
+ 
+            const canvasRef = useRef(null); const containerRef = useRef(null); const pinchStartRef = useRef(null); const lastTouchTargetRef = useRef(null); const lastUIUpdateRef = useRef(0); const offlineStartRef = useRef(0); const activeTradesRef = useRef([]); const isNotificationVisible = useRef(false);
+            const lastSignalRef = useRef(null); 
+            
+            const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
+            const resultLabelsRef = useRef([]);
+            
+            const addNotification = useCallback((data) => { 
+                if (data.type === 'SIGNAL' && isNotificationVisible.current) return; 
+                if (data.type === 'WIN' || data.type === 'LOSS') return;
+                const id = Date.now() + Math.random(); 
+                const duration = data.type === 'OFFLINE' ? 0 : 4000; 
+                setNotifications(prev => { if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }]; return prev; }); 
+                if (data.type !== 'OFFLINE') { isNotificationVisible.current = true; setTimeout(() => { setNotifications(prev => prev.filter(n => n.id !== id)); if (notifications.length <= 1) isNotificationVisible.current = false; }, duration); } else { isNotificationVisible.current = true; } 
+            }, []);
+            
+            const generateDNAFromName = (materialIdx, adjectiveIdx) => {
+                const normMat = materialIdx / (MATERIALS.length - 1);
+                const normAdj = adjectiveIdx / (ADJECTIVES.length - 1);
+                const volatility = 0.5 + (normMat * 1.5); 
+                const structure = 0.2 + Math.pow(normAdj, 2) * 0.75; 
+                const seed = (materialIdx * 100) + adjectiveIdx;
+                const pseudoRand = Math.sin(seed) * 0.5 + 0.5; 
+                const trendBias = (pseudoRand - 0.5) * 0.3; 
+                const isStepped = (adjectiveIdx % 3 === 0);
+                return { volatility, aggression: 0.1 + (normMat * 0.7), structure, trendBias, isStepped };
+            };
+
+            const updatePredictor = (newPrice) => { 
+                const state = marketStatesRef.current[activeTab]; 
+                const tickHistory = tickHistoriesRef.current[activeTab];
+                const ks = kinematicsRef.current[activeTab];
+                
+                tickHistory.push(newPrice); 
+                if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); 
+                state.longTermTicks.push(newPrice); 
+                if (state.longTermTicks.length > 1000) state.longTermTicks.shift(); 
+                
+                if (tickHistory.length < 20) return; 
+                
+                const currentEma = ks.lastEma === null ? newPrice : (ks.alpha * newPrice) + (1 - ks.alpha) * ks.lastEma; 
+                const velocity = ks.lastEma !== null ? (currentEma - ks.lastEma) : 0; 
+                const acceleration = velocity - ks.lastVelocity; 
+                const n = tickHistory.length; 
+                const mean = tickHistory.reduce((a, b) => a + b, 0) / n; 
+                const stdDev = Math.sqrt(tickHistory.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n); 
+                const zScore = stdDev === 0 ? 0 : (newPrice - mean) / stdDev; 
+
+                const longTermMean = state.longTermTicks.length > 0 ? state.longTermTicks.reduce((a, b) => a + b, 0) / state.longTermTicks.length : mean;
+                const trendDirection = newPrice > longTermMean ? 1 : -1; 
+                const aggression = state.dna ? state.dna.aggression : 0.5;
+                const zThreshold = 1.6 + (aggression * 0.5); 
+                
+                const isOversold = zScore < -zThreshold;
+                const isPullbackBuy = trendDirection === 1 && zScore < -1.0 && velocity < 0 && acceleration > 0;
+                const isBuySignalRaw = (isOversold && acceleration > ks.delta) || isPullbackBuy;
+
+                const isOverbought = zScore > zThreshold;
+                const isPullbackSell = trendDirection === -1 && zScore > 1.0 && velocity > 0 && acceleration < 0;
+                const isSellSignalRaw = (isOverbought && acceleration < -ks.delta) || isPullbackSell;
+
+                let finalBuy = isBuySignalRaw; 
+                let finalSell = isSellSignalRaw; 
+                
+                const brain = aiBrain.current; 
+                const normalizedDuration = (state.tradeDuration || 10000) / 30000;
+                const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration, trend: trendDirection }; 
+                
+                const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias; 
+                const confidence = sigmoid(rawSum); 
+                
+                ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures; 
+                setAiConfidence(confidence); 
+                
+                if ((finalBuy || finalSell) && (state.currentValue !== state.lastSignalTick)) { 
+                    if (Math.random() < 0.15 || confidence > 0.7) { 
+                        const signalType = finalBuy ? 'BUY' : 'SELL';
+                        const timeSinceLast = Date.now() - (state.lastSignalTime || 0);
+                        if (timeSinceLast > 2000) { 
+                            addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice }); 
+                            state.lastSignalTick = state.currentValue;
+                            state.lastSignalTime = Date.now();
+                            if (autopilot && confidence > 0.65 && activeTradesRef.current.length === 0) {
+                                const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
+                                if (lastSignalRef.current !== currentSignal) { 
+                                    lastSignalRef.current = currentSignal;
+                                    setTimeout(() => executeTrade(signalType), 100); 
+                                }
+                            }
+                        }
+                    } 
+                } 
+            };
+
+            const processMarketLogic = (tabIndex, isWarmup = false) => { 
+                const state = marketStatesRef.current[tabIndex]; 
+                const dna = state.dna;
+                state.ticksSincePatternChange++; 
+                if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) { 
+                    state.ticksSincePatternChange = 0; 
+                    const randState = Math.random();
+                    const momentumThresh = 0.1 + (dna.aggression * 0.4); 
+                    if (randState < momentumThresh) {
+                        state.patternState = 'MOMENTUM'; 
+                        state.structTotalDuration = Math.floor(60 + Math.random() * 120); 
+                        state.momentumDir = Math.random() > (0.5 - dna.trendBias) ? 1 : -1; 
+                    } else {
+                        if (Math.random() < dna.structure) { 
+                            state.patternState = 'STRUCTURED'; 
+                            state.structTotalDuration = Math.floor(180 + Math.random() * 300); 
+                            state.structPeriodX = Math.floor((15 + Math.random() * 25) * TICK_RATE); 
+                            state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN'; 
+                            state.structTimer = 0; 
+                            state.currentStructLimit = state.structPeriodX; 
+                        } else { 
+                            state.patternState = 'NORMAL'; 
+                            state.structTotalDuration = Math.floor(120 + Math.random() * 180); 
+                        }
+                    }
+                    state.nextPatternSwitchTick = state.structTotalDuration; 
+                } 
+                
+                let drift = 0; let volatilityMult = 1.0;
+                
+                if (state.patternState === 'MOMENTUM') { 
+                    drift = state.momentumDir * 0.6; 
+                    volatilityMult = 2.5; 
+                } 
+                else if (state.patternState === 'STRUCTURED') { 
+                    state.structTimer++; 
+                    if (state.structTimer >= state.currentStructLimit) { 
+                        state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP'; 
+                        state.structTimer = 0; 
+                        state.currentStructLimit = Math.floor((10 + Math.random() * 40) * TICK_RATE); 
+                    } 
+                    drift = state.structPhase === 'UP' ? 0.18 : -0.18; 
+                    volatilityMult = 1.0; 
+                } else { 
+                    drift = 0; 
+                    volatilityMult = 0.8; 
+                } 
+                
+                drift += dna.trendBias; 
+                const r1 = Math.random(); const r2 = Math.random(); const noise = (r1 + r2) - 1.0; 
+                const baseVol = state.currentValue * 0.0006; 
+                const movement = (drift + (noise * 1.5)) * baseVol * volatilityMult * dna.volatility;
+                
+                if (dna.isStepped && state.patternState !== 'MOMENTUM') {
+                    state.stepBuffer = (state.stepBuffer || 0) + movement;
+                    if (state.ticksSincePatternChange % 8 === 0) {
+                        state.currentValue += state.stepBuffer;
+                        state.stepBuffer = 0; 
+                    }
+                } else {
+                    state.currentValue += movement; 
+                }
+                
+                if (state.currentValue < 10) state.currentValue = 10; 
+                if (isWarmup) state.visualValue = state.currentValue; 
+                state.lastDirection = movement > 0 ? 1 : -1; 
+                
+                if (tabIndex === activeTab) { updatePredictor(state.currentValue); } 
+                else { const tickHistory = tickHistoriesRef.current[tabIndex]; tickHistory.push(state.currentValue); if (tickHistory.length > TICK_HISTORY_LIMIT) tickHistory.shift(); }
+            };
+            
+            const updateVisualCandleLogic = (tabIndex) => { 
+                const state = marketStatesRef.current[tabIndex];
+                state.visualTicks.push(state.visualValue); 
+                
+                if (state.visualTicks.length >= state.ticksPerCandle) { 
+                    const lastCandleClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualTicks[0]; 
+                    const close = state.visualTicks[state.visualTicks.length - 1]; 
+                    const newCandle = { 
+                        open: lastCandleClose, 
+                        close, 
+                        high: Math.max(...state.visualTicks, lastCandleClose), 
+                        low: Math.min(...state.visualTicks, lastCandleClose), 
+                        color: close >= lastCandleClose ? '#10b981' : '#f43f5e' 
+                    };
+                    state.candles.push(newCandle); 
+                    state.targetScroll = state.candles.length; 
+                    state.visualTicks = []; 
+                    
+                    const MAX_CANDLES = 600; 
+                    if (state.candles.length > MAX_CANDLES) {
+                        const deleteCount = state.candles.length - MAX_CANDLES;
+                        state.candles.splice(0, deleteCount);
+                        state.scrollOffset -= deleteCount;
+                        state.targetScroll -= deleteCount;
+                    } 
+                } 
+            };
+
+            const warmUpMarket = (tabIndex, minutes = 10) => { 
+                const state = marketStatesRef.current[tabIndex];
+                const ticksToSimulate = minutes * 60 * TICK_RATE; 
+                for (let i = 0; i < ticksToSimulate; i++) { processMarketLogic(tabIndex, true); updateVisualCandleLogic(tabIndex); } 
+                state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; state.initialized = true;
+            };
+            
+            const generateAssetForTab = useCallback((tabIndex) => {
+                const now = Date.now();
+                assetHistoryRef.current = assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
+                let attempts = 0; let selectedName = ""; let matIdx, adjIdx;
+                const findAvailableAsset = () => {
+                    while (attempts < 100) {
+                        attempts++;
+                        const matRand = (Math.random() + Math.random()) / 2;
+                        const adjRand = (Math.random() + Math.random()) / 2;
+                        const mIdx = Math.floor(matRand * MATERIALS.length);
+                        const aIdx = Math.floor(adjRand * ADJECTIVES.length);
+                        const fullName = `${MATERIALS[mIdx]} ${ADJECTIVES[aIdx]}`;
+                        const isCurrentlyActive = assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
+                        const inHistory = assetHistoryRef.current.some(a => a.name === fullName);
+                        if (!isCurrentlyActive && !inHistory) {
+                            selectedName = fullName; matIdx = mIdx; adjIdx = aIdx;
+                            assetHistoryRef.current.push({ name: fullName, timestamp: now });
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+                if (!findAvailableAsset()) { setTimeout(() => generateAssetForTab(tabIndex), 500); return; }
+                const rand = Math.pow(Math.random(), 2.5); 
+                const newBasePrice = 1000 + (1 - rand) * 99000; 
+                const dna = generateDNAFromName(matIdx, adjIdx);
+                let preferredDurations;
+                if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; } 
+                else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; } 
+                else { preferredDurations = [5000, 10000, 15000, 30000]; }
+                const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
+                tickHistoriesRef.current[tabIndex] = [];
+                kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
+                marketStatesRef.current[tabIndex] = { ...createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
+                
+                const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15; 
+                warmUpMarket(tabIndex, randomWarmupMinutes);
+                setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
+                if (tabIndex === activeTab) { setCurrentDuration(randomDuration / 1000); }
+                setIsGenerating(false);
+            }, [activeTab, assetsInfo]);
+
+            useEffect(() => {
+                if (!marketStatesRef.current[0].initialized) { 
+                    setIsGenerating(true);
+                    setTimeout(() => generateAssetForTab(0), 10);
+                    setTimeout(() => generateAssetForTab(1), 50);
+                    setTimeout(() => generateAssetForTab(2), 100);
+                }
+            }, []);
+
+            const handleTabChange = (index) => {
+                setActiveTab(index);
+                const state = marketStatesRef.current[index];
+                setCurrentDuration(state.tradeDuration / 1000);
+                setCurrentPriceUI(state.visualValue);
+            };
+            
+            const handleGenerateAsset = () => { 
+                if (isGenerating) return; 
+                setIsGenerating(true); 
+                setTimeout(() => { generateAssetForTab(activeTab); }, 600); 
+            };
+            
+            const executeTrade = (type) => { 
+                if (!isOnline) return; 
+                const maxTrades = autopilot ? 1 : 4;
+                if (activeTradesRef.current.length >= maxTrades) return;
+                setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
+                isNotificationVisible.current = false; 
+                const state = marketStatesRef.current[activeTab]; 
+                const ks = kinematicsRef.current[activeTab];
+                const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
+                const now = Date.now(); 
+                const duration = state.tradeDuration || 10000;
+                const newTrade = { 
+                    id: Date.now() + Math.random(), type, entryPrice: state.visualValue, 
+                    entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + duration, 
+                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab 
+                }; 
+                activeTradesRef.current.push(newTrade); 
+                setActiveTradesUI([...activeTradesRef.current]); 
+                setBalance(prev => prev - INVESTMENT_AMOUNT); 
+            };
+
+            const handleNotificationClick = (notification) => {
+                if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
+            };
+
+            useEffect(() => {
+                const handleOnline = () => {
+                    setIsOnline(true);
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
+                    
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+
+                    if (ticksMissed > 0 && ticksMissed < 10000) { 
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                    } 
+                    lastLogicTimeRef.current = now; 
+                };
+                
+                const handleOffline = () => {
+                    setIsOnline(false);
+                    addNotification({ type: 'OFFLINE' });
+                };
+
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, [addNotification]);
+            
+            useEffect(() => {
+                let animationId;
+                const LOGIC_RATE_MS = 1000 / TICK_RATE;
+                
+                const lastLogicTimeRef = { current: Date.now() };
+                const isTabVisibleRef = { current: !document.hidden };
+
+                const runMarketLogic = () => {
+                    processMarketLogic(0); updateVisualCandleLogic(0);
+                    processMarketLogic(1); updateVisualCandleLogic(1);
+                    processMarketLogic(2); updateVisualCandleLogic(2);
+                    
+                    const state = marketStatesRef.current[activeTab];
+                    const ks = kinematicsRef.current[activeTab];
+                    if (state && ks) {
+                        const currentTicksToWait = Math.floor((state.tradeDuration || 10000) / 1000 * TICK_RATE);
+                        const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
+                        const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
+                        if (isBuy || isSell) {
+                           aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: currentTicksToWait, featuresSnapshot: { ...ks.currentFeatures } });
+                        }
+                        aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => { t.ticksToWait--; if (t.ticksToWait <= 0) { const isWin = t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice; trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount); return false; } return true; });
+                    }
+                };
+
+                 const performCatchUp = () => {
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+                    
+                    if (ticksMissed > 0 && ticksMissed < 10000) {
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
+                    } else if (ticksMissed >= 10000) {
+                        lastLogicTimeRef.current = now;
+                    }
+
+                    const performCatchUp = () => {
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+                    
+                    if (ticksMissed > 0 && ticksMissed < 10000) {
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                        
+                        [0, 1, 2].forEach(idx => {
+                            const s = marketStatesRef.current[idx];
+                            s.targetScroll = s.candles.length; 
+                            s.scrollOffset = s.candles.length;
+                            s.visualValue = s.currentValue;
+                        });
+                        
+                        lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
+                    } else if (ticksMissed >= 10000) {
+                        lastLogicTimeRef.current = now;
+                    }
+                };
+
+                };
+
+                const handleVisibilityChange = () => {
+                    isTabVisibleRef.current = !document.hidden;
+                    if (isTabVisibleRef.current && navigator.onLine) {
+                        performCatchUp();
+                    }
+                };
+
+                const handleOnline = () => {
+                    setIsOnline(true);
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
+                    if (isTabVisibleRef.current) {
+                        performCatchUp();
+                    }
+                };
+
+                const handleOffline = () => {
+                    setIsOnline(false);
+                    addNotification({ type: 'OFFLINE' });
+                };
+
+                document.addEventListener("visibilitychange", handleVisibilityChange);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                const loop = () => {
+                    animationId = requestAnimationFrame(loop);      
+                    const now = Date.now();
+                    if (!navigator.onLine || !isTabVisibleRef.current) return;
+                    const deltaTime = now - lastLogicTimeRef.current;
+                    if (deltaTime >= LOGIC_RATE_MS) {
+                        const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
+                        const safeTicks = Math.min(ticksToProcess, 10);
+                        for (let i = 0; i < safeTicks; i++) {
+                            runMarketLogic();}
+                        lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;    
+                        const realNow = Date.now();
+                        const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
+                        if (expiredTrades.length > 0) {
+                            let totalPayout = 0;
+                            expiredTrades.forEach(trade => {
+                                const tradeState = marketStatesRef.current[trade.tabIndex];
+                                const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
+                                if (trade.aiSnapshot) trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
+                                if (trade.tabIndex === activeTab) {
+                                    const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
+                                    resultLabelsRef.current.push({
+                                        id: Date.now() + Math.random(), xIndex: currentPreciseIndex,
+                                        price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount,
+                                        timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS'
+                                    });
+                                }
+                                if (isWin) { totalPayout += trade.amount * 1.85; }
+                            });
+                            activeTradesRef.current = activeTradesRef.current.filter(t => realNow < t.expiryTime);
+                            setActiveTradesUI([...activeTradesRef.current]);
+                            if (totalPayout > 0) setBalance(b => b + totalPayout);
+                        }
+                    }
+
+                    const state = marketStatesRef.current[activeTab]; 
+                    if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
+                        setCurrentPriceUI(state.visualValue);
+                        setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
+                        lastUIUpdateRef.current = now;
+                    }
+
+                    const canvas = canvasRef.current;
+                    if (canvas) {
+                         const dpr = window.devicePixelRatio || 1;
+                        const width = canvas.width / dpr;
+                        const height = canvas.height / dpr;
+                        const ctx = canvas.getContext('2d');
+                        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                        
+                        const SMOOTHING = 0.05;
+                        state.visualValue += (state.currentValue - state.visualValue) * 0.3;
+                        state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
+                        ctx.fillStyle = '#050505';
+                        ctx.fillRect(0, 0, width, height);
+                        const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
+                        let allCandles = [...state.candles];
+                        allCandles.push({ open: lastClose, close: state.visualValue, high: Math.max(state.visualValue, lastClose), low: Math.min(state.visualValue, lastClose), color: state.visualValue >= lastClose ? '#10b981' : '#f43f5e', isForming: true });
+                        
+                        zoomCurrentRef.current += (zoomTargetRef.current - zoomCurrentRef.current) * SMOOTHING;
+                        if (Math.abs(zoomTargetRef.current - zoomCurrentRef.current) < 0.05) zoomCurrentRef.current = zoomTargetRef.current;
+                        const candleWidth = width / zoomCurrentRef.current;
+                        
+                        let targetAnchorPercent = 0.75;
+                        const activeTrades = activeTradesRef.current.filter(t => t.tabIndex === activeTab); 
+                        if (activeTrades.length > 0) {
+                            const maxDuration = Math.max(...activeTrades.map(t => t.duration));
+                            if (maxDuration >= 30000) targetAnchorPercent = 0.50;
+                            else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
+                        }
+                        if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
+                        state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * SMOOTHING;
+                        const anchorX = width * state.currentAnchor;
+                        const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth;
+                        
+                        let minPrice = Infinity, maxPrice = -Infinity;
+                        allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
+                        if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+
+                        if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
+                        const rawRange = maxPrice - minPrice || 10;
+                        const targetPadding = rawRange * 0.45;
+                        const targetMin = minPrice - targetPadding;
+                        const targetMax = maxPrice + targetPadding;
+                        const VERTICAL_SMOOTHING = 0.05; 
+                        state.visualMinPrice += (targetMin - state.visualMinPrice) * VERTICAL_SMOOTHING;
+                        state.visualMaxPrice += (targetMax - state.visualMaxPrice) * VERTICAL_SMOOTHING;
+                        let yMin = state.visualMinPrice;
+                        let yMax = state.visualMaxPrice;
+
+                        const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
+                        const safeZoneBottom = Math.min(height - 250, height * 0.65);
+                        if (currentPriceY > safeZoneBottom) {
+                            const pixelsOff = currentPriceY - safeZoneBottom;
+                            const pricePerPixel = (yMax - yMin) / height;
+                            const priceShift = pixelsOff * pricePerPixel;
+                            state.visualMinPrice -= priceShift * 0.1;
+                            state.visualMaxPrice -= priceShift * 0.1;
+                            yMin = state.visualMinPrice;
+                            yMax = state.visualMaxPrice;
+                        }
+                        
+                        const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
+                        const currentY = getY(state.visualValue);
+                        ctx.strokeStyle = '#222';
+                        ctx.setLineDash([4, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(0, currentY);
+                        ctx.lineTo(width, currentY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        const previewDuration = state.tradeDuration || 10000;
+                        const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
+                        const futureIndex = currentPreciseIndex + (previewDuration / 1000 * TICK_RATE / state.ticksPerCandle);
+                        const xFuture = getX(futureIndex);
+                        const xCurrent = getX(currentPreciseIndex);
+                        ctx.strokeStyle = activeTrades.length > 0 ? '#333' : '#666'; 
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([2, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(xCurrent, currentY);
+                        ctx.lineTo(xFuture, currentY);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(xFuture, currentY - 20);
+                        ctx.lineTo(xFuture, currentY + 20);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        const barWidth = Math.max(1, candleWidth * 0.8);
+                        allCandles.forEach((candle, i) => {
+                            const x = getX(i);
+                            if (x < -candleWidth || x > width + candleWidth) return;
+                            const yOpen = getY(candle.open), yClose = getY(candle.close), yHigh = getY(candle.high), yLow = getY(candle.low);
+                            ctx.strokeStyle = candle.color;
+                            ctx.lineWidth = Math.max(1, candleWidth * 0.1);
+                            ctx.beginPath();
+                            ctx.moveTo(x, yHigh);
+                            ctx.lineTo(x, yLow);
+                            ctx.stroke();
+                            const bodyHeight = Math.max(0.5, Math.abs(yClose - yOpen));
+                            ctx.fillStyle = candle.color;
+                            if (candle.isForming) { ctx.shadowBlur = 10; ctx.shadowColor = candle.color; }
+                            ctx.fillRect(x - barWidth/2, Math.min(yOpen, yClose), barWidth, bodyHeight);
+                            ctx.shadowBlur = 0;
+                        });
+
+                        activeTrades.forEach(trade => {
+                            const yEntry = getY(trade.entryPrice);
+                            const xEntry = getX(trade.entryIndex);
+                            const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
+                            const futureIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle) + (remainingSeconds * TICK_RATE / state.ticksPerCandle);
+                            const xExpire = getX(futureIndex);
+                            const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
+                            ctx.strokeStyle = tradeColor;
+                            ctx.lineWidth = 1;
+                            ctx.globalAlpha = 0.5;
+                            ctx.beginPath();
+                            ctx.moveTo(xEntry, yEntry);
+                            ctx.lineTo(width, yEntry);
+                            ctx.stroke();
+                            ctx.setLineDash([4, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(xExpire, yEntry - 40);
+                            ctx.lineTo(xExpire, yEntry + 40);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            ctx.globalAlpha = 0.3;
+                            ctx.beginPath();
+                            ctx.moveTo(xEntry, yEntry);
+                            ctx.lineTo(xExpire, yEntry);
+                            ctx.stroke();
+                            ctx.globalAlpha = 1;
+                            ctx.fillStyle = tradeColor;
+                            ctx.beginPath();
+                            ctx.arc(xEntry, yEntry, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+
+                        resultLabelsRef.current = resultLabelsRef.current.filter(label => (Date.now() - label.timestamp) < 2000); 
+                        resultLabelsRef.current.forEach(label => {
+                            const age = Date.now() - label.timestamp;
+                            const progress = age / 2000;
+
+                            const direction = label.profit > 0 ? -1 : 1;
+                            const yPos = getY(label.price) - 30 + (progress * 50 * direction); 
+                            const xPos = getX(label.xIndex);
+                            const opacity = 1 - Math.pow(progress, 3); 
+                            ctx.globalAlpha = opacity;
+                            const bg = label.type === 'WIN' ? '#10B981' : '#F43F5E';
+                            const shadowColor = label.type === 'WIN' ? 'rgba(16, 185, 129, 0.40)' : 'rgba(244, 63, 94, 0.40)';
+                            ctx.fillStyle = bg;
+                            ctx.shadowBlur = 20;
+                            ctx.shadowColor = shadowColor;
+                            const labelW = 100;
+                            const labelH = 40;
+                            ctx.beginPath();
+                            ctx.roundRect(xPos - labelW/2, yPos - labelH/2, labelW, labelH, 20);
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                            ctx.fillStyle = '#000000'; 
+                            ctx.font = '500 14px "BDO Grotesk", sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            const prefix = label.profit > 0 ? '+' : '-';
+                            ctx.fillText(`${prefix} $${Math.abs(label.profit).toFixed(0)}`, xPos, yPos);
+                        });
+                        ctx.globalAlpha = 1;
+
+                        const isSmallScreen = width < 768;
+                        const labelX = isSmallScreen ? 0 : width - 100;
+                        const textX = isSmallScreen ? 50 : width - 50;
+                        ctx.fillStyle = '#111';
+                        ctx.fillRect(labelX, currentY - 10, 100, 20);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 12px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(state.visualValue.toFixed(2), textX, currentY + 5);
+                    }
+                };
+                
+                lastLogicTimeRef.current = Date.now();
+                loop();
+
+                return () => {
+                    cancelAnimationFrame(animationId);
+                    document.removeEventListener("visibilitychange", handleVisibilityChange);
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, [zoom, addNotification, activeTab, autopilot]);
+
+            useEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+                const resizeObserver = new ResizeObserver((entries) => {
+                    const entry = entries[0];
+                    if (!entry) return;
+                    const { width, height } = entry.contentRect;
+                    if (width === 0 || height === 0) return;
+                    const canvas = canvasRef.current;
+                    if (canvas) {
+                        const dpr = window.devicePixelRatio || 1;
+                        canvas.width = width * dpr;
+                        canvas.height = height * dpr;
+                        canvas.style.width = `${width}px`;
+                        canvas.style.height = `${height}px`;
+                        isMobileRef.current = width < 768;
+                    }
+                });
+                resizeObserver.observe(container);
+                return () => resizeObserver.disconnect();
+            }, []);
+
+            const sliderPercentage = ((zoom - 80) / (500 - 80)) * 100;
+
+            const maxTrades = autopilot ? 1 : 4;
+            const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= maxTrades;
+
+            return (
+            <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
+                    <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
+                        <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
+                    </div>
+                    <div className="absolute top-10 left-0 w-full px-6 md:px-10 flex justify-between items-center z-20 pointer-events-none">
+                        <div className="flex flex-col justify-center items-start gap-2">
+                            <div className="opacity-50 text-[10px] font-normal leading-tight">BALANCE GLOBAL</div>
+                            <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
+                        </div>
+
+                        { }
+                        <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
+                            {assetsInfo.map((info, idx) => {
+                                const isActive = activeTab === idx;
+                                return (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => handleTabChange(idx)}
+                                        className={`
+                                            tab-item h-[60px] px-10 flex items-center justify-center gap-[10px]
+                                            ${isActive ? 'border border-white' : 'border border-white/40'}
+                                            overflow-hidden
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {isActive && (
+                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                            )}
+                                            <div className={`
+                                                text-sm font-normal font-sans leading-none uppercase
+                                                ${isActive ? 'text-white' : 'text-white/40'}
+                                            `}>
+                                                {info.name}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="flex md:hidden items-center gap-2">
+                             <div className={`w-2 h-2 rounded-full ${isGenerating ? 'bg-white animate-pulse' : 'bg-[#D9D9D9]'}`} />
+                             <div className="text-sm font-normal uppercase whitespace-nowrap">{isGenerating ? 'BUSCANDO...' : assetsInfo[activeTab].name}</div>
+                        </div>
+
+                        <div className="flex flex-col justify-center items-end gap-2">
+                            <div className="opacity-50 text-[10px] font-normal leading-tight">MERCADO EN VIVO</div>
+                            <div className="text-sm font-normal leading-tight">${currentPriceUI.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                        </div>
+                    </div>
+
+                    <div className="absolute top-[100px] md:top-[140px] w-full flex flex-col items-center gap-4 z-30 pointer-events-none px-4">
+                        {!isOnline && (
+                            <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
+                                <img src={ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                                <div className="flex flex-col justify-center items-start gap-1">
+                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
+                                    <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {notifications.map(note => {
+                            let iconSrc = ICONS.activityNeutral;
+                            let iconClass = "w-5 h-5";
+                            let iconStyle = {};
+
+                            if(note.type === 'SIGNAL') {
+                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
+                            }
+
+                            return (
+                                <div 
+                                    key={note.id} 
+                                    onClick={() => handleNotificationClick(note)}
+                                    className={`glass-panel !bg-white/0 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
+                                >
+
+                                    <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
+                                        <img src={iconSrc} className={`${iconClass}`} style={{filter: 'brightness(0) invert(1)'}}/>
+                                    </div>
+
+                                    <div className="flex flex-col animate-blink justify-center items-start gap-1">
+                                        <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
+                                            {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÃ“N'}
+                                        </div>
+                                        <div className="text-sm font-medium">
+                                            {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {activeTradesUI.map(trade => {
+                            const tradeAsset = assetsInfo[trade.tabIndex].name;
+                            const isBuy = trade.type === 'BUY';
+                            const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
+                            const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
+                            const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
+                            const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
+
+                            return (
+                                <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
+                                                                    {/* Icono */}
+                                <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
+                                    <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
+                                </div>
+                                
+                                { }
+                                <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
+                                    {/* Etiqueta superior */}
+                                    <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
+                                        {isMobile ? 'OPERACIÃ“N ABIERTA' : tradeAsset}
+                                    </div>
+                                    
+                                    { }
+                                    <div className="flex items-baseline justify-start w-full gap-4">
+                                        <div className="text-white text-sm font-medium font-sans leading-none uppercase">
+                                            {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
+                                        </div>
+                                        { }
+                                        <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
+                                            {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
+                         <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
+                         <div className="flex items-center gap-2">
+                            <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden">
+                                <div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div>
+                            </div>
+                            <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+                         </div>
+                    </div>
+
+                    <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
+                        <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
+                            
+                            <button 
+                                onClick={handleGenerateAsset}
+                                disabled={isGenerating || !isOnline}
+                                className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <div className="w-5 h-5 flex items-center justify-center">
+                                    <img 
+                                        src={isGenerating ? ICONS.loader : ICONS.search} 
+                                        className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} 
+                                    />
+                                </div>
+                                <div className="flex flex-col items-start gap-0">
+                                    <div className="opacity-60 text-white text-[10px] font-normal uppercase">
+                                        {isMobile ? 'EXPLORACIÃ“N' : 'EXPLORAR'}
+                                    </div>
+                                    <div className="text-white text-sm font-normal uppercase whitespace-nowrap">
+                                        {!isOnline ? 'SIN RED' : (isGenerating ? 'BUSCANDO...' : 'NUEVO ACTIVO')}
+                                    </div>
+                                </div>
+                            </button>
+
+                            {!isMobile && (
+                                <div 
+                                    className="h-16 px-6 flex items-center gap-4 order-2 md:order-4 cursor-pointer hover:opacity-80 transition-opacity" 
+                                    onClick={() => setAutopilot(!autopilot)}
+                                >
+                                    <div className={`toggle-switch ${autopilot ? 'active' : ''}`}>
+                                        <div className="toggle-knob"></div>
+                                    </div>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
+                                        <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-0 order-3 md:order-3">
+                                {/* LÃ­nea de fondo (Track) */}
+                                <div className="w-full h-[2px] bg-[#333] rounded-full absolute top-1/2 transform -translate-y-1/2"></div>
+                                
+                                {/* Indicador Visual (Knob/Barrita) */}
+                                <div 
+                                    className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                                    style={{ left: `${100 - sliderPercentage}%` }} 
+                                ></div>
+
+                                { }
+                                <input 
+                                    type="range" 
+                                    min="80" 
+                                    max="500" 
+                                    value={580 - zoom} 
+                                    onChange={(e) => { 
+                                        const val = Number(e.target.value);
+                                        const invertedVal = 580 - val;
+                                        isUserInteractingRef.current = true; 
+                                        zoomTargetRef.current = invertedVal; 
+                                        setZoom(invertedVal); 
+                                    }} 
+                                    className="zoom-slider" 
+                                />
+                            </div>
+
+                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
+                                <button 
+                                    onClick={() => executeTrade('BUY')} 
+                                    disabled={tradesDisabled}
+                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
+                                    <div className="flex flex-col items-start gap-0 text-black">
+                                        <div className="opacity-60 text-[10px] font-normal">OPERAR COMPRA</div>
+                                        <div className="text-sm font-medium">BUY / {currentDuration}s.</div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => executeTrade('SELL')} 
+                                    disabled={tradesDisabled}
+                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${tradesDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
+                                    <div className="flex flex-col items-start gap-0 text-black">
+                                        <div className="opacity-60 text-[10px] font-normal">OPERAR VENTA</div>
+                                        <div className="text-sm font-medium">SELL / {currentDuration}s.</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MarketSim />);

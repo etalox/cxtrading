@@ -870,7 +870,7 @@
                             ctx.font = '500 14px "BDO Grotesk", sans-serif';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
-                            const prefix = label.profit > 0 ? '+' : '';
+                            const prefix = label.profit > 0 ? '+' : '-';
                             ctx.fillText(`${prefix} $${Math.abs(label.profit).toFixed(0)}`, xPos, yPos);
                         });
                         ctx.globalAlpha = 1;

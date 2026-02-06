@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CX Trade - Modern Trading </title>
-
+    
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -26,7 +26,7 @@
     .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 30px; }
     .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 20px; transition: all 0.2s ease; }
     .glass-button:active { transform: scale(0.96); }
-
+    
     .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 16px; }
     .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
@@ -35,566 +35,637 @@
         position: relative; 
         width: 44px; 
         height: 24px; 
-        background: rgba(255, 255, 255, 0.1); 
+        background: rgba(255,255,255,0.2); 
         border-radius: 12px; 
         cursor: pointer; 
-        transition: background 0.2s ease;
-        flex-shrink: 0;
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
     }
-    .toggle-switch.active { background: rgba(16, 185, 129, 0.3); }
+
+    /* Hover solo cuando está APAGADO */
+    .toggle-switch:not(.active):hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    /* ESTADO ACTIVO (ENCENDIDO) */
+    .toggle-switch.active { 
+        background: #ffffff; 
+        /* Animación de pulso eléctrico */
+        animation: glow-pulse 4s infinite ease-in-out;
+    }
+
+    /* LA BOLITA (KNOB) */
     .toggle-knob { 
         position: absolute; 
         top: 2px; 
         left: 2px; 
         width: 20px; 
         height: 20px; 
-        background: rgba(255, 255, 255, 0.3); 
+        background: #ffffff; 
         border-radius: 50%; 
-        transition: all 0.2s ease;
-    }
-    .toggle-switch.active .toggle-knob { 
-        left: 22px; 
-        background: rgba(16, 185, 129, 0.8); 
+        transition: transform 0.3s, background 0.3s; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    /* --- SLIDER ZOOM --- */
-    .zoom-slider {
-        -webkit-appearance: none;
-        width: 100%;
-        height: 2px;
-        border-radius: 1px;
-        background: rgba(255, 255, 255, 0.1);
-        outline: none;
+    /* Movimiento y cambio de color del Knob al activar */
+    .toggle-switch.active .toggle-knob { 
+        transform: translateX(20px); 
+        background: #050505; 
     }
-    .zoom-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.4);
-        cursor: pointer;
+
+    /* Animación de pulso para el toggle activo */
+    @keyframes glow-pulse {
+        0%, 100% { 
+            box-shadow: 0 0 8px rgba(255,255,255,0.5), 0 0 15px rgba(255,255,255,0.3); 
+        }
+        50% { 
+            box-shadow: 0 0 15px rgba(255,255,255,0.8), 0 0 25px rgba(255,255,255,0.5); 
+        }
     }
-    .zoom-slider::-moz-range-thumb {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.4);
-        cursor: pointer;
-        border: none;
+
+    /* --- CANDLES --- */
+    .candle {
+        position: absolute;
+        width: 8px;
+        bottom: 0;
+        border-radius: 2px;
+    }
+
+    .candle-wick {
+        position: absolute;
+        width: 1px;
+        background: rgba(255,255,255,0.5);
+        left: 50%;
+        transform: translateX(-50%);
     }
 
     /* --- ANIMACIONES --- */
-    @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in { animation: fade-in 0.3s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
-    /* --- RESPONSIVE --- */
-    @media (max-width: 768px) {
-        .glass-panel { border-radius: 20px; }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-blink { animation: blink 1.5s infinite; }
+    .animate-pulse { animation: pulse 2s infinite; }
+
+    .zoom-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,0.1);
+        outline: none;
+        cursor: pointer;
     }
 
-    /* Hack para activar aceleración por hardware */
-    canvas { transform: translateZ(0); will-change: transform; }
+    .zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+
+    .zoom-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+
+    /* --- SCROLLBAR --- */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        /* ========== ICONOS (DATA URLS) ========== */
+        // --- ICONOS ---
         const ICONS = {
-            plus: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 4v16m8-8H4'/%3E%3C/svg%3E",
-            minus: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M20 12H4'/%3E%3C/svg%3E",
-            trendingUp: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'/%3E%3C/svg%3E",
-            trendingDown: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'/%3E%3C/svg%3E",
-            chevronDown: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E",
-            zap: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E",
-            activity: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E",
-            globe: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E"
+            trendingUp: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'/%3E%3C/svg%3E",
+            trendingDown: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'/%3E%3C/svg%3E",
+            activityWin: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'/%3E%3C/svg%3E",
+            activityLoss: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'/%3E%3C/svg%3E",
+            activityNeutral: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E",
+            wifiOff: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3l8.293 8.293'/%3E%3C/svg%3E",
         };
 
+        // --- CONFIGURACIÓN ---
+        const INVESTMENT_AMOUNT = 100;
+        const LOGIC_RATE_MS = 100;
+        const VISUAL_FPS = 60;
+        const VISUAL_FRAME_TIME = 1000 / VISUAL_FPS;
+        const NUM_VISIBLE_CANDLES = 40;
+
         const assetsInfo = [
-            { id: 'BTCUSD', name: 'BTC/USD', color: '#F7931A', initialPrice: 42000 },
-            { id: 'ETHUSD', name: 'ETH/USD', color: '#627EEA', initialPrice: 2200 },
-            { id: 'SOLUSD', name: 'SOL/USD', color: '#9945FF', initialPrice: 98 },
-            { id: 'XRPUSD', name: 'XRP/USD', color: '#00AAE4', initialPrice: 0.52 },
-            { id: 'ADAUSD', name: 'ADA/USD', color: '#0033AD', initialPrice: 0.38 },
-            { id: 'DOGUSD', name: 'DOG/USD', color: '#C3A634', initialPrice: 0.08 }
+            { name: 'EUR/USD', volatility: 0.001, baseValue: 60000, priceIncrement: 0.0001 },
+            { name: 'USD/JPY', volatility: 0.0012, baseValue: 50000, priceIncrement: 0.01 },
+            { name: 'GBP/USD', volatility: 0.0015, baseValue: 55000, priceIncrement: 0.0001 },
         ];
 
-        /* ============================= */
-        /*       COMPONENTE PRINCIPAL     */
-        /* ============================= */
+        const generateMarketData = (assetIndex, ticksPerCandle = 100) => {
+            const asset = assetsInfo[assetIndex];
+            let value = asset.baseValue;
+            const candles = [];
+            const allTicks = [];
+            for (let i = 0; i < 150; i++) {
+                const open = value;
+                let high = open, low = open, close = open;
+                const candleTicks = [];
+                for (let t = 0; t < ticksPerCandle; t++) {
+                    const change = (Math.random() - 0.5) * asset.volatility * asset.baseValue;
+                    value = Math.max(asset.baseValue * 0.5, value + change);
+                    if (value > high) high = value;
+                    if (value < low) low = value;
+                    candleTicks.push(value);
+                }
+                close = value;
+                candles.push({ open, high, low, close, ticks: candleTicks });
+                allTicks.push(...candleTicks);
+            }
+            return { candles, allTicks };
+        };
+
         const MarketSim = () => {
             const [activeTab, setActiveTab] = useState(0);
-            const [zoom, setZoom] = useState(80);
-            const [priceData, setPriceData] = useState(assetsInfo.map(a => ({ price: a.initialPrice, history: [] })));
+            const [balance, setBalance] = useState(5000);
+            const [totalProfit, setTotalProfit] = useState(0);
+            const [winRate, setWinRate] = useState(0);
+            const [totalTrades, setTotalTrades] = useState(0);
+            const [zoom, setZoom] = useState(200);
+            const [currentDuration, setCurrentDuration] = useState(10);
             const [autopilot, setAutopilot] = useState(false);
-            const [balance, setBalance] = useState(10000);
-            const [totalInvested, setTotalInvested] = useState(0);
-            const [durations] = useState([10, 30, 60, 120]);
-            const [currentDurationIndex, setCurrentDurationIndex] = useState(0);
+            const [activeTradesUI, setActiveTradesUI] = useState([]);
             const [notifications, setNotifications] = useState([]);
-            const [activeTrades, setActiveTrades] = useState([]);
-            const [closedTrades, setClosedTrades] = useState([]);
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [aiLearnedCount, setAiLearnedCount] = useState(0);
-            const [aiConfidence, setAiConfidence] = useState(0.2);
-            const [isOnline, setIsOnline] = useState(true);
+            const [aiConfidence, setAiConfidence] = useState(0);
+            const [tradesDisabled, setTradesDisabled] = useState(false);
+            const [buttonStates, setButtonStates] = useState({ BUY: null, SELL: null });
 
-            // NUEVO: Estados para gestionar operaciones en botones
-            const [buttonStates, setButtonStates] = useState({
-                buy: { active: false, timeRemaining: 0, expiryTime: null },
-                sell: { active: false, timeRemaining: 0, expiryTime: null }
-            });
-            const [pendingRestores, setPendingRestores] = useState([]); // Para desktop: controlar restauraciones pendientes
+            const isMobile = window.innerWidth < 768;
+            const maxSimultaneousTrades = isMobile ? 1 : 3;
+            const restoreDelayMs = 5000;
 
             const canvasRef = useRef(null);
-            const containerRef = useRef(null);
-            const pinchStartRef = useRef(null);
-            const isUserInteractingRef = useRef(false);
+            const marketStatesRef = useRef([]);
+            const kinematicsRef = useRef([]);
+            const activeTradesRef = useRef([]);
             const zoomTargetRef = useRef(zoom);
-            const interactionTimeoutRef = useRef(null);
-            const simulationIntervalRef = useRef(null);
+            const isUserInteractingRef = useRef(false);
+            const lastZoomUpdateRef = useRef(Date.now());
+            const lastLogicTimeRef = useRef(Date.now());
+            const lastVisualTimeRef = useRef(Date.now());
             const isNotificationVisible = useRef(false);
-            const tradeIdCounterRef = useRef(1);
-            const autopilotLoopRef = useRef(null);
-            const tradesDisabledRef = useRef(false);
-            const [tradesDisabled, setTradesDisabled] = useState(false);
-
-            const currentDuration = durations[currentDurationIndex];
-            const isMobile = window.innerWidth < 768;
-            const MAX_CONCURRENT_TRADES = isMobile ? 1 : 3;
-
-            // Detectar si es mobile
-            const checkMobile = () => window.innerWidth < 768;
-
-            const addNotification = useCallback((data) => {
-                // Filtrar notificaciones de operación abierta/cerrada
-                if (data.type === 'TRADE_OPENED' || data.type === 'TRADE_CLOSED') {
-                    return; // No mostrar estas notificaciones
-                }
-
-                if (data.type === 'SIGNAL' && isNotificationVisible.current) return;
-
-                const id = Date.now() + Math.random();
-                setNotifications(prev => {
-                    if (data.type === 'SIGNAL' && prev.length === 0) return [{ ...data, id }];
-                    if (data.type !== 'OFFLINE') {
-                        isNotificationVisible.current = true;
-                        setTimeout(() => {
-                            setNotifications(p => p.filter(n => n.id !== id));
-                            isNotificationVisible.current = false;
-                        }, 5000);
-                    }
-                    return [...prev, { ...data, id }];
-                });
-            }, []);
+            const buttonTimersRef = useRef({ BUY: null, SELL: null });
 
             useEffect(() => {
-                const handleOnline = () => { 
-                    setIsOnline(true); 
-                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE')); 
+                marketStatesRef.current = assetsInfo.map((asset, index) => {
+                    const ticksPerCandle = 100;
+                    const { candles, allTicks } = generateMarketData(index, ticksPerCandle);
+                    const lastCandle = candles[candles.length - 1];
+                    return {
+                        candles: candles.slice(0, -1),
+                        visualTicks: [...lastCandle.ticks],
+                        visualValue: lastCandle.ticks[lastCandle.ticks.length - 1],
+                        ticksPerCandle,
+                        priceIncrement: asset.priceIncrement,
+                        tradeDuration: currentDuration * 1000,
+                        baseValue: asset.baseValue,
+                        volatility: asset.volatility,
+                    };
+                });
+
+                kinematicsRef.current = assetsInfo.map(() => ({
+                    velocity: 0,
+                    acceleration: 0,
+                    previousValue: 0,
+                    currentFeatures: { velocity: 0, acceleration: 0, movingAvg: 0, rsi: 50 },
+                    valueHistory: [],
+                }));
+            }, []);
+
+            const addNotification = (note) => {
+                const id = Date.now() + Math.random();
+                setNotifications(prev => [...prev, { ...note, id }]);
+                setTimeout(() => {
+                    setNotifications(prev => prev.filter(n => n.id !== id));
+                }, 4000);
+            };
+
+            const runMarketLogic = () => {
+                marketStatesRef.current.forEach((state, index) => {
+                    const ks = kinematicsRef.current[index];
+                    const asset = assetsInfo[index];
+                    const currentValue = state.visualValue;
+                    const change = (Math.random() - 0.5) * asset.volatility * asset.baseValue;
+                    let newValue = currentValue + change;
+                    newValue = Math.max(asset.baseValue * 0.5, newValue);
+
+                    ks.previousValue = currentValue;
+                    ks.velocity = newValue - currentValue;
+                    ks.acceleration = ks.velocity - (ks.valueHistory[ks.valueHistory.length - 1] || 0);
+                    ks.valueHistory.push(ks.velocity);
+                    if (ks.valueHistory.length > 20) ks.valueHistory.shift();
+                    const movingAvg = ks.valueHistory.reduce((a, b) => a + b, 0) / ks.valueHistory.length;
+                    let gains = 0, losses = 0;
+                    for (let i = 1; i < ks.valueHistory.length; i++) {
+                        const diff = ks.valueHistory[i];
+                        if (diff > 0) gains += diff;
+                        else losses += Math.abs(diff);
+                    }
+                    const avgGain = gains / ks.valueHistory.length;
+                    const avgLoss = losses / ks.valueHistory.length;
+                    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+                    const rsi = 100 - (100 / (1 + rs));
+                    ks.currentFeatures = { velocity: ks.velocity, acceleration: ks.acceleration, movingAvg, rsi };
+
+                    state.visualTicks.push(newValue);
+                    state.visualValue = newValue;
+
+                    if (state.visualTicks.length >= state.ticksPerCandle) {
+                        const ticksToUse = state.visualTicks.slice(0, state.ticksPerCandle);
+                        const open = ticksToUse[0];
+                        const close = ticksToUse[ticksToUse.length - 1];
+                        const high = Math.max(...ticksToUse);
+                        const low = Math.min(...ticksToUse);
+                        state.candles.push({ open, high, low, close, ticks: ticksToUse });
+                        state.visualTicks = state.visualTicks.slice(state.ticksPerCandle);
+                        if (state.candles.length > 200) state.candles.shift();
+                    }
+                });
+
+                const now = Date.now();
+                const tradesToRemove = [];
+                activeTradesRef.current.forEach(trade => {
+                    if (now >= trade.expiryTime) {
+                        const state = marketStatesRef.current[trade.tabIndex];
+                        const exitPrice = state.visualValue;
+                        const priceDiff = exitPrice - trade.entryPrice;
+                        const isWin = (trade.type === 'BUY' && priceDiff > 0) || (trade.type === 'SELL' && priceDiff < 0);
+                        const payout = isWin ? trade.amount * 1.8 : 0;
+                        setBalance(prev => prev + payout);
+                        setTotalProfit(prev => prev + (payout - trade.amount));
+                        setTotalTrades(prev => {
+                            const newTotal = prev + 1;
+                            setWinRate(current => {
+                                const newWins = isWin ? (current * prev + 1) : (current * prev);
+                                return newWins / newTotal;
+                            });
+                            return newTotal;
+                        });
+                        tradesToRemove.push(trade.id);
+                        
+                        if (isMobile) {
+                            const tradeType = trade.type;
+                            setButtonStates(prev => ({ ...prev, [tradeType]: null }));
+                            setTradesDisabled(false);
+                        }
+
+                        const ks = kinematicsRef.current[trade.tabIndex];
+                        ks.currentFeatures.outcome = isWin ? 1 : -1;
+                        setAiLearnedCount(prev => prev + 1);
+                        setAiConfidence(prev => Math.min(1, prev + (isWin ? 0.01 : -0.005)));
+                    }
+                });
+
+                if (tradesToRemove.length > 0) {
+                    activeTradesRef.current = activeTradesRef.current.filter(t => !tradesToRemove.includes(t.id));
+                    setActiveTradesUI([...activeTradesRef.current]);
+                }
+
+                if (autopilot && activeTradesRef.current.length === 0 && isOnline) {
+                    const state = marketStatesRef.current[activeTab];
+                    const ks = kinematicsRef.current[activeTab];
+                    const { rsi, velocity, movingAvg } = ks.currentFeatures;
+                    let signal = null;
+                    let confidence = 0;
+                    if (rsi < 30 && velocity > movingAvg * 0.5) { signal = 'BUY'; confidence = 0.7 + (30 - rsi) / 100; }
+                    else if (rsi > 70 && velocity < movingAvg * 0.5) { signal = 'SELL'; confidence = 0.7 + (rsi - 70) / 100; }
+                    if (signal && !isNotificationVisible.current) {
+                        addNotification({ type: 'SIGNAL', signalType: signal, confidence: Math.min(confidence, 0.95) });
+                        isNotificationVisible.current = true;
+                        setTimeout(() => { isNotificationVisible.current = false; }, 4000);
+                    }
+                }
+            };
+
+            const executeTrade = (type) => { 
+                if (!isOnline) return; 
+                if (activeTradesRef.current.length >= maxSimultaneousTrades) return;
+                if (tradesDisabled) return;
+                
+                setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
+                isNotificationVisible.current = false; 
+                const state = marketStatesRef.current[activeTab]; 
+                const ks = kinematicsRef.current[activeTab];
+                const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle); 
+                const now = Date.now(); 
+                const duration = state.tradeDuration || 10000;
+                const newTrade = { 
+                    id: Date.now() + Math.random(), type, entryPrice: state.visualValue, 
+                    entryIndex: currentPreciseIndex, startTime: now, expiryTime: now + duration, 
+                    amount: INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab 
+                }; 
+                activeTradesRef.current.push(newTrade); 
+                setActiveTradesUI([...activeTradesRef.current]); 
+                setBalance(prev => prev - INVESTMENT_AMOUNT);
+
+                const remainingTime = duration / 1000;
+                setButtonStates(prev => ({ 
+                    ...prev, 
+                    [type]: { 
+                        tradeId: newTrade.id,
+                        expiryTime: newTrade.expiryTime,
+                        remainingTime 
+                    } 
+                }));
+
+                if (!isMobile) {
+                    setTradesDisabled(true);
+                    if (buttonTimersRef.current[type]) {
+                        clearTimeout(buttonTimersRef.current[type]);
+                    }
+                    buttonTimersRef.current[type] = setTimeout(() => {
+                        setButtonStates(prev => ({ ...prev, [type]: null }));
+                        const anyActiveButtons = Object.values(buttonStates).some(state => state !== null && state.tradeId !== newTrade.id);
+                        if (!anyActiveButtons) {
+                            setTradesDisabled(false);
+                        }
+                    }, restoreDelayMs);
+                }
+            };
+
+            const handleNotificationClick = (notification) => {
+                if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
+            };
+
+            useEffect(() => {
+                const handleOnline = () => {
+                    setIsOnline(true);
+                    setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
+                    const now = Date.now();
+                    const timeMissed = now - lastLogicTimeRef.current;
+                    const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
+                    if (ticksMissed > 0 && ticksMissed < 10000) { 
+                        for (let i = 0; i < ticksMissed; i++) {
+                            runMarketLogic();
+                        }
+                    } 
+                    lastLogicTimeRef.current = now; 
                 };
-                const handleOffline = () => { 
-                    setIsOnline(false); 
-                    addNotification({ type: 'OFFLINE' }); 
+                
+                const handleOffline = () => {
+                    setIsOnline(false);
+                    addNotification({ type: 'OFFLINE' });
                 };
 
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
-
-                if (!navigator.onLine) addNotification({ type: 'OFFLINE' });
-
                 return () => {
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
                 };
-            }, [addNotification]);
-
-            // Actualizar tiempo restante en botones
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    setButtonStates(prev => {
-                        const now = Date.now();
-                        const newStates = { ...prev };
-
-                        ['buy', 'sell'].forEach(key => {
-                            if (newStates[key].active && newStates[key].expiryTime) {
-                                const remaining = Math.max(0, (newStates[key].expiryTime - now) / 1000);
-                                newStates[key].timeRemaining = remaining;
-
-                                // En mobile, resetear botón cuando termina la operación
-                                if (remaining <= 0 && isMobile) {
-                                    newStates[key] = { active: false, timeRemaining: 0, expiryTime: null };
-                                }
-                            }
-                        });
-
-                        return newStates;
-                    });
-                }, 100);
-
-                return () => clearInterval(interval);
-            }, [isMobile]);
-
-            // Desktop: Manejar restauraciones pendientes
-            useEffect(() => {
-                if (!isMobile && pendingRestores.length > 0) {
-                    const now = Date.now();
-                    const toRestore = pendingRestores.filter(restore => now >= restore.restoreTime);
-
-                    if (toRestore.length > 0) {
-                        toRestore.forEach(restore => {
-                            setButtonStates(prev => ({
-                                ...prev,
-                                [restore.type]: { active: false, timeRemaining: 0, expiryTime: null }
-                            }));
-                        });
-
-                        setPendingRestores(prev => prev.filter(restore => now < restore.restoreTime));
-
-                        // Habilitar botones si ya no hay operaciones activas
-                        const anyActive = Object.values(buttonStates).some(state => state.active);
-                        if (!anyActive) {
-                            setTradesDisabled(false);
-                            tradesDisabledRef.current = false;
-                        }
-                    }
-                }
-            }, [pendingRestores, buttonStates, isMobile]);
-
-            const executeTrade = useCallback((type) => {
-                if (tradesDisabledRef.current) return;
-
-                const activeCount = activeTrades.filter(t => t.tabIndex === activeTab).length;
-
-                // Verificar límite de operaciones concurrentes
-                if (activeCount >= MAX_CONCURRENT_TRADES) return;
-
-                const currentPrice = priceData[activeTab].price;
-                const tradeId = tradeIdCounterRef.current++;
-                const expiryTime = Date.now() + (currentDuration * 1000);
-
-                const newTrade = {
-                    id: tradeId,
-                    type,
-                    entryPrice: currentPrice,
-                    expiryTime,
-                    tabIndex: activeTab,
-                    duration: currentDuration
-                };
-
-                setActiveTrades(prev => [...prev, newTrade]);
-
-                // Actualizar estado del botón
-                const buttonKey = type === 'BUY' ? 'buy' : 'sell';
-                setButtonStates(prev => ({
-                    ...prev,
-                    [buttonKey]: { active: true, timeRemaining: currentDuration, expiryTime }
-                }));
-
-                // Desktop: Programar restauración después de 5 segundos
-                if (!isMobile) {
-                    const restoreTime = Date.now() + 5000;
-                    setPendingRestores(prev => [...prev, { type: buttonKey, restoreTime }]);
-
-                    // Deshabilitar botones durante 5 segundos
-                    setTradesDisabled(true);
-                    tradesDisabledRef.current = true;
-
-                    setTimeout(() => {
-                        const stillActive = activeTrades.filter(t => t.expiryTime > Date.now()).length;
-                        if (stillActive < MAX_CONCURRENT_TRADES) {
-                            setTradesDisabled(false);
-                            tradesDisabledRef.current = false;
-                        }
-                    }, 5000);
-                }
-
-                // Mobile: Deshabilitar botones hasta que termine la operación
-                if (isMobile) {
-                    setTradesDisabled(true);
-                    tradesDisabledRef.current = true;
-                }
-
-                setTimeout(() => {
-                    const exitPrice = priceData[activeTab].price;
-                    const priceDiff = exitPrice - currentPrice;
-                    const isWin = (type === 'BUY' && priceDiff > 0) || (type === 'SELL' && priceDiff < 0);
-                    const pnl = isWin ? 100 : -100;
-
-                    setBalance(prev => prev + pnl);
-                    setActiveTrades(prev => prev.filter(t => t.id !== tradeId));
-                    setClosedTrades(prev => [...prev, { ...newTrade, exitPrice, pnl, isWin }]);
-
-                    setAiLearnedCount(c => c + 1);
-                    if (isWin) setAiConfidence(c => Math.min(1, c + 0.02));
-                    else setAiConfidence(c => Math.max(0, c - 0.01));
-
-                    // Mobile: Restaurar botón y habilitar
-                    if (isMobile) {
-                        setButtonStates(prev => ({
-                            ...prev,
-                            [buttonKey]: { active: false, timeRemaining: 0, expiryTime: null }
-                        }));
-                        setTradesDisabled(false);
-                        tradesDisabledRef.current = false;
-                    }
-                }, currentDuration * 1000);
-
-            }, [activeTab, priceData, currentDuration, activeTrades, MAX_CONCURRENT_TRADES, isMobile]);
-
-            const handleNotificationClick = (notification) => {
-                if (notification.type === 'SIGNAL') {
-                    executeTrade(notification.signalType);
-                }
-            };
+            }, []);
 
             useEffect(() => {
-                const generateSignal = () => {
-                    if (autopilot && !isNotificationVisible.current && isOnline) {
-                        const signalType = Math.random() > 0.5 ? 'BUY' : 'SELL';
-                        const confidence = 0.6 + Math.random() * 0.3;
-                        const newPrice = priceData[activeTab].price;
-                        addNotification({
-                            type: 'SIGNAL',
-                            signalType: signalType,
-                            confidence: confidence,
-                            price: newPrice
-                        });
+                const logicInterval = setInterval(() => {
+                    if (isOnline) {
+                        runMarketLogic();
+                        lastLogicTimeRef.current = Date.now();
                     }
-                };
-
-                if (autopilot) {
-                    autopilotLoopRef.current = setInterval(generateSignal, 8000);
-                } else {
-                    if (autopilotLoopRef.current) {
-                        clearInterval(autopilotLoopRef.current);
-                        autopilotLoopRef.current = null;
-                    }
-                    setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
-                    isNotificationVisible.current = false;
-                }
-
-                return () => {
-                    if (autopilotLoopRef.current) {
-                        clearInterval(autopilotLoopRef.current);
-                        autopilotLoopRef.current = null;
-                    }
-                };
-            }, [autopilot, priceData, activeTab, addNotification, isOnline]);
+                }, LOGIC_RATE_MS);
+                return () => clearInterval(logicInterval);
+            }, [activeTab, autopilot, isOnline, currentDuration]);
 
             useEffect(() => {
                 const canvas = canvasRef.current;
                 if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
 
-                const ctx = canvas.getContext('2d', { 
-                    alpha: false, 
-                    desynchronized: true 
-                });
+                const updateCanvas = () => {
+                    const w = canvas.clientWidth;
+                    const h = canvas.clientHeight;
+                    canvas.width = w * dpr;
+                    canvas.height = h * dpr;
+                    ctx.scale(dpr, dpr);
 
-                const resizeCanvas = () => {
-                    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-                    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-                    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                };
+                    const state = marketStatesRef.current[activeTab];
+                    if (!state) return;
 
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
+                    ctx.clearRect(0, 0, w, h);
 
-                return () => window.removeEventListener('resize', resizeCanvas);
-            }, []);
+                    const totalCandles = state.candles.length;
+                    const visualProgress = state.visualTicks.length / state.ticksPerCandle;
+                    const totalVisualCandles = totalCandles + visualProgress;
+                    const startIndex = Math.max(0, totalVisualCandles - NUM_VISIBLE_CANDLES);
+                    const endIndex = totalVisualCandles;
 
-            useEffect(() => {
-                const updatePrices = () => {
-                    setPriceData(prev => prev.map((data, idx) => {
-                        const volatility = assetsInfo[idx].initialPrice * 0.0002;
-                        const change = (Math.random() - 0.5) * volatility * 2;
-                        const newPrice = data.price + change;
-                        const newHistory = [...data.history, newPrice].slice(-1000);
-                        return { price: newPrice, history: newHistory };
-                    }));
-                };
+                    const visibleRange = endIndex - startIndex;
+                    const candleWidth = (w / visibleRange) * (zoom / 200);
+                    const gap = candleWidth * 0.2;
+                    const bodyWidth = candleWidth - gap;
 
-                updatePrices();
-                simulationIntervalRef.current = setInterval(updatePrices, 100);
+                    const visibleCandles = state.candles.slice(Math.floor(startIndex), totalCandles);
+                    const allVisibleValues = [];
+                    visibleCandles.forEach(c => { allVisibleValues.push(c.high, c.low); });
+                    if (state.visualTicks.length > 0) {
+                        allVisibleValues.push(Math.max(...state.visualTicks), Math.min(...state.visualTicks));
+                    }
 
-                return () => {
-                    if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
-                };
-            }, []);
+                    if (allVisibleValues.length === 0) return;
+                    const minVal = Math.min(...allVisibleValues);
+                    const maxVal = Math.max(...allVisibleValues);
+                    const range = maxVal - minVal || 1;
+                    const padding = h * 0.1;
 
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
+                    const priceToY = (price) => h - padding - ((price - minVal) / range) * (h - 2 * padding);
 
-                const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-                const width = canvas.offsetWidth;
-                const height = canvas.offsetHeight;
+                    let x = w - (endIndex - Math.floor(startIndex)) * candleWidth;
+                    visibleCandles.forEach((candle, i) => {
+                        const isGreen = candle.close >= candle.open;
+                        const color = isGreen ? '#10B981' : '#F43F5E';
+                        const yHigh = priceToY(candle.high);
+                        const yLow = priceToY(candle.low);
+                        const yOpen = priceToY(candle.open);
+                        const yClose = priceToY(candle.close);
+                        const yTop = Math.min(yOpen, yClose);
+                        const yBottom = Math.max(yOpen, yClose);
+                        const bodyHeight = Math.max(yBottom - yTop, 2);
 
-                const draw = () => {
-                    ctx.fillStyle = '#050505';
-                    ctx.fillRect(0, 0, width, height);
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(x + bodyWidth / 2, yHigh);
+                        ctx.lineTo(x + bodyWidth / 2, yLow);
+                        ctx.stroke();
 
-                    const history = priceData[activeTab].history;
-                    if (history.length < 2) return;
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x, yTop, bodyWidth, bodyHeight);
 
-                    const visiblePoints = Math.floor(zoom * 2);
-                    const dataSlice = history.slice(-visiblePoints);
-
-                    const minPrice = Math.min(...dataSlice);
-                    const maxPrice = Math.max(...dataSlice);
-                    const priceRange = maxPrice - minPrice || 1;
-
-                    const padding = height * 0.1;
-                    const chartHeight = height - 2 * padding;
-
-                    const xStep = width / (dataSlice.length - 1);
-
-                    ctx.strokeStyle = assetsInfo[activeTab].color;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-
-                    dataSlice.forEach((price, i) => {
-                        const x = i * xStep;
-                        const y = padding + chartHeight * (1 - (price - minPrice) / priceRange);
-                        if (i === 0) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
+                        x += candleWidth;
                     });
 
-                    ctx.stroke();
+                    if (state.visualTicks.length > 0 && visibleCandles.length > 0) {
+                        const lastCandle = visibleCandles[visibleCandles.length - 1];
+                        const partialOpen = lastCandle.close;
+                        const partialTicks = state.visualTicks;
+                        const partialHigh = Math.max(...partialTicks);
+                        const partialLow = Math.min(...partialTicks);
+                        const partialClose = partialTicks[partialTicks.length - 1];
+                        const isGreen = partialClose >= partialOpen;
+                        const color = isGreen ? '#10B981' : '#F43F5E';
 
-                    const currentPrice = dataSlice[dataSlice.length - 1];
-                    const currentY = padding + chartHeight * (1 - (currentPrice - minPrice) / priceRange);
+                        const yHigh = priceToY(partialHigh);
+                        const yLow = priceToY(partialLow);
+                        const yOpen = priceToY(partialOpen);
+                        const yClose = priceToY(partialClose);
+                        const yTop = Math.min(yOpen, yClose);
+                        const yBottom = Math.max(yOpen, yClose);
+                        const bodyHeight = Math.max(yBottom - yTop, 2);
 
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.strokeStyle = color;
+                        ctx.globalAlpha = 0.6;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(x + bodyWidth / 2, yHigh);
+                        ctx.lineTo(x + bodyWidth / 2, yLow);
+                        ctx.stroke();
+
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x, yTop, bodyWidth, bodyHeight);
+                        ctx.globalAlpha = 1;
+                    }
+
+                    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                     ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    const currentY = priceToY(state.visualValue);
                     ctx.beginPath();
                     ctx.moveTo(0, currentY);
-                    ctx.lineTo(width, currentY);
+                    ctx.lineTo(w, currentY);
                     ctx.stroke();
                     ctx.setLineDash([]);
 
-                    ctx.fillStyle = assetsInfo[activeTab].color;
-                    ctx.beginPath();
-                    ctx.arc(width - 5, currentY, 4, 0, Math.PI * 2);
-                    ctx.fill();
-
+                    ctx.fillStyle = 'white';
                     ctx.font = '12px BDO Grotesk';
-                    ctx.fillStyle = 'rgba(255,255,255,0.5)';
                     ctx.textAlign = 'right';
-                    ctx.fillText(currentPrice.toFixed(2), width - 15, currentY - 10);
+                    ctx.fillText(state.visualValue.toFixed(2), w - 10, currentY - 5);
+
+                    activeTradesRef.current.forEach(trade => {
+                        if (trade.tabIndex !== activeTab) return;
+                        const tradeY = priceToY(trade.entryPrice);
+                        ctx.strokeStyle = trade.type === 'BUY' ? '#10B981' : '#F43F5E';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([10, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(0, tradeY);
+                        ctx.lineTo(w, tradeY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    });
                 };
 
-                draw();
-            }, [priceData, activeTab, zoom]);
+                let animationId;
+                const animate = () => {
+                    const now = Date.now();
+                    if (now - lastVisualTimeRef.current >= VISUAL_FRAME_TIME) {
+                        updateCanvas();
+                        lastVisualTimeRef.current = now;
+                    }
+                    animationId = requestAnimationFrame(animate);
+                };
+                animate();
+
+                return () => cancelAnimationFrame(animationId);
+            }, [activeTab, zoom]);
 
             useEffect(() => {
-                if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
-
-                interactionTimeoutRef.current = setTimeout(() => {
-                    isUserInteractingRef.current = false;
-                }, 500);
-
-                return () => {
-                    if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
-                };
-            }, [zoom]);
-
-            const handleWheel = useCallback((e) => {
-                e.preventDefault();
-                isUserInteractingRef.current = true;
-
-                const delta = -e.deltaY * 0.2;
-                const newZoom = Math.max(20, Math.min(500, zoom + delta));
-
-                zoomTargetRef.current = newZoom;
-                setZoom(newZoom);
-            }, [zoom]);
-
-            useEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
-
-                container.addEventListener('wheel', handleWheel, { passive: false });
-
-                return () => container.removeEventListener('wheel', handleWheel);
-            }, [handleWheel]);
-
-            useEffect(() => {
-                const handleTouchStart = (e) => {
-                    if (e.touches.length === 2) {
-                        e.preventDefault();
-                        const touch1 = e.touches[0];
-                        const touch2 = e.touches[1];
-                        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-                        pinchStartRef.current = { distance: dist, zoom };
-                        isUserInteractingRef.current = true;
-                    }
-                };
-
-                const handleTouchMove = (e) => {
-                    if (e.touches.length === 2 && pinchStartRef.current) {
-                        e.preventDefault();
-                        const touch1 = e.touches[0];
-                        const touch2 = e.touches[1];
-                        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-                        const scale = dist / pinchStartRef.current.distance;
-                        const newZoom = Math.max(20, Math.min(500, pinchStartRef.current.zoom * scale));
-                        zoomTargetRef.current = newZoom;
-                        setZoom(newZoom);
-                    }
-                };
-
-                const handleTouchEnd = (e) => {
-                    if (e.touches.length < 2) {
-                        pinchStartRef.current = null;
-                    }
-                };
-
-                const container = containerRef.current;
-                if (container) {
-                    container.addEventListener('touchstart', handleTouchStart, { passive: false });
-                    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-                    container.addEventListener('touchend', handleTouchEnd);
+                if (!isUserInteractingRef.current) {
+                    const smoothZoomInterval = setInterval(() => {
+                        setZoom(currentZoom => {
+                            const diff = zoomTargetRef.current - currentZoom;
+                            if (Math.abs(diff) < 0.5) return zoomTargetRef.current;
+                            return currentZoom + diff * 0.1;
+                        });
+                    }, 16);
+                    return () => clearInterval(smoothZoomInterval);
                 }
+            }, []);
 
-                return () => {
-                    if (container) {
-                        container.removeEventListener('touchstart', handleTouchStart);
-                        container.removeEventListener('touchmove', handleTouchMove);
-                        container.removeEventListener('touchend', handleTouchEnd);
+            useEffect(() => {
+                const autoResetZoom = setInterval(() => {
+                    const now = Date.now();
+                    if (!isUserInteractingRef.current && now - lastZoomUpdateRef.current > 3000) {
+                        zoomTargetRef.current = 200;
                     }
-                };
-            }, [zoom, addNotification, activeTab, autopilot]);
+                }, 100);
+                return () => clearInterval(autoResetZoom);
+            }, []);
 
-            const activeTradesUI = activeTrades.filter(t => t.tabIndex === activeTab);
-            const totalPnL = balance + totalInvested - 10000;
-            const pnlClass = totalPnL >= 0 ? 'text-[#10B981]' : 'text-[#F43F5E]';
-            const pnlSign = totalPnL >= 0 ? '+' : '';
+            useEffect(() => {
+                marketStatesRef.current.forEach(state => {
+                    state.tradeDuration = currentDuration * 1000;
+                });
+            }, [currentDuration]);
 
             return (
-                <div className="relative w-screen h-screen">
-                    <div ref={containerRef} className="absolute inset-0 bg-[#050505]">
-                        <canvas ref={canvasRef} className="w-full h-full" />
+                <div className="w-screen h-screen flex flex-col">
+                    <div className="flex-1 relative">
+                        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                     </div>
 
-                    <div className="absolute top-4 md:top-6 left-6 md:left-10 right-6 md:right-10 z-20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0 pointer-events-auto">
-                        <div className="flex items-center gap-3">
-                            <div className="glass-panel px-4 py-2 flex items-center gap-3">
-                                <div className="text-white/40 text-xs font-normal">SALDO</div>
-                                <div className="text-white text-lg font-bold">${balance.toFixed(2)}</div>
-                                <div className={`${pnlClass} text-xs font-medium`}>{pnlSign}${totalPnL.toFixed(2)}</div>
-                            </div>
-                        </div>
+                    <div className="flex-none w-full px-4 md:px-8 pb-6 md:pb-8 pointer-events-none">
+                        <div className="glass-panel p-4 md:p-6 pointer-events-auto">
+                            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
 
-                        <div className="flex items-center gap-2">
-                            <div className="glass-panel px-3 py-2 flex items-center gap-2 md:gap-3 text-xs md:text-sm">
-                                <img src={ICONS.zap} className="w-4 h-4 text-white" style={{ filter: 'invert(1)' }} />
-                                <span className="text-white/60 font-normal hidden md:inline">Autopilot</span>
+                            <div className="flex gap-2 order-1 md:order-1">
+                                {assetsInfo.map((asset, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => setActiveTab(idx)}
+                                        className={`tab-item px-4 py-2 ${activeTab === idx ? 'bg-white/10' : ''}`}
+                                    >
+                                        <div className="text-xs opacity-60">{asset.name}</div>
+                                        <div className="text-sm font-medium">
+                                            {marketStatesRef.current[idx]?.visualValue.toFixed(asset.name === 'USD/JPY' ? 2 : 4) || '...'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-4 order-3 md:order-2">
+                                <div>
+                                    <div className="text-[10px] opacity-60">SALDO</div>
+                                    <div className="text-sm font-medium">${balance.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] opacity-60">P&L</div>
+                                    <div className={`text-sm font-medium ${totalProfit >= 0 ? 'text-[#10B981]' : 'text-[#F43F5E]'}`}>
+                                        {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] opacity-60">WIN RATE</div>
+                                    <div className="text-sm font-medium">{(winRate * 100).toFixed(0)}%</div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 order-4 md:order-3">
+                                <div className="text-xs opacity-60">PILOTO AUTOMÁTICO</div>
                                 <div 
                                     className={`toggle-switch ${autopilot ? 'active' : ''}`}
                                     onClick={() => setAutopilot(!autopilot)}
@@ -602,64 +673,123 @@
                                     <div className="toggle-knob"></div>
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-3 w-full md:w-48 order-5 md:order-4">
+                                <div className="text-xs opacity-60 whitespace-nowrap">ZOOM</div>
+                                <input 
+                                    type="range" 
+                                    min="20" 
+                                    max="580" 
+                                    value={580 - zoom} 
+                                    onMouseDown={() => { isUserInteractingRef.current = true; }} 
+                                    onMouseUp={() => { isUserInteractingRef.current = false; lastZoomUpdateRef.current = Date.now(); }} 
+                                    onTouchStart={() => { isUserInteractingRef.current = true; }} 
+                                    onTouchEnd={() => { isUserInteractingRef.current = false; lastZoomUpdateRef.current = Date.now(); }} 
+                                    onChange={(e) => { 
+                                        const val = parseFloat(e.target.value); 
+                                        const invertedVal = 580 - val;
+                                        isUserInteractingRef.current = true; 
+                                        zoomTargetRef.current = invertedVal; 
+                                        setZoom(invertedVal); 
+                                    }} 
+                                    className="zoom-slider" 
+                                />
+                            </div>
+
+                            <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
+                                <button 
+                                    onClick={() => executeTrade('BUY')} 
+                                    disabled={tradesDisabled || (isMobile && buttonStates.BUY !== null)}
+                                    className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${(tradesDisabled || (isMobile && buttonStates.BUY !== null)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    style={{ minWidth: isMobile ? 'auto' : '192px', width: isMobile ? '50%' : '192px' }}
+                                >
+                                    <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
+                                    <div className="flex flex-col items-start gap-0 text-black">
+                                        <div className="opacity-60 text-[10px] font-normal">
+                                            {buttonStates.BUY ? 'OPERACIÓN ABIERTA' : 'OPERAR COMPRA'}
+                                        </div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-sm font-medium">
+                                                {buttonStates.BUY ? 'COMPRANDO...' : `BUY / ${currentDuration}s.`}
+                                            </div>
+                                            {buttonStates.BUY && (
+                                                <div className="text-sm font-medium tabular-nums">
+                                                    {(Math.max(0, (buttonStates.BUY.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => executeTrade('SELL')} 
+                                    disabled={tradesDisabled || (isMobile && buttonStates.SELL !== null)}
+                                    className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${(tradesDisabled || (isMobile && buttonStates.SELL !== null)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    style={{ minWidth: isMobile ? 'auto' : '192px', width: isMobile ? '50%' : '192px' }}
+                                >
+                                    <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
+                                    <div className="flex flex-col items-start gap-0 text-black">
+                                        <div className="opacity-60 text-[10px] font-normal">
+                                            {buttonStates.SELL ? 'OPERACIÓN ABIERTA' : 'OPERAR VENTA'}
+                                        </div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-sm font-medium">
+                                                {buttonStates.SELL ? 'VENDIENDO...' : `SELL / ${currentDuration}s.`}
+                                            </div>
+                                            {buttonStates.SELL && (
+                                                <div className="text-sm font-medium tabular-nums">
+                                                    {(Math.max(0, (buttonStates.SELL.expiryTime - Date.now()) / 1000)).toFixed(1)}s
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+
                         </div>
                     </div>
+                </div>
 
-                    <div className="absolute top-20 md:top-24 left-1/2 transform -translate-x-1/2 z-20 flex flex-col gap-2 max-w-md w-full px-4 pointer-events-auto">
-                        {notifications.filter(n => n.type !== 'TRADE_OPENED' && n.type !== 'TRADE_CLOSED').map(note => {
-                            const isBuy = note.signalType === 'BUY';
-                            const bgColor = note.type === 'OFFLINE' ? 'bg-white/5' : (isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]');
-                            const shadowClass = note.type === 'OFFLINE' ? '' : (isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]');
-                            const icon = note.type === 'OFFLINE' ? ICONS.globe : (isBuy ? ICONS.trendingUp : ICONS.trendingDown);
-                            const iconStyle = (note.type !== 'OFFLINE' && !isBuy) ? { transform: 'scaleY(-1)' } : {};
+                    <div className="fixed top-6 right-6 md:right-10 z-50 flex flex-col gap-3 w-[calc(100vw-48px)] md:w-auto pointer-events-none">
+                        {!isOnline && (
+                            <div className="glass-panel !bg-white/10 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 pointer-events-auto">
+                                <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
+                                    <img src={ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                                </div>
+                                <div className="flex flex-col justify-center items-start gap-1">
+                                    <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
+                                    <div className="text-sm font-medium">SIN CONEXIÓN Wi-Fi</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {notifications.map(note => {
+                            let iconSrc = ICONS.activityNeutral;
+                            let iconClass = "w-5 h-5";
+                            let iconStyle = {};
+
+                            if(note.type === 'SIGNAL') {
+                                iconSrc = note.signalType === 'BUY' ? ICONS.activityWin : ICONS.activityLoss;
+                                iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
+                            }
 
                             return (
                                 <div 
                                     key={note.id} 
-                                    className={`h-[62px] py-2 pl-2 pr-[22px] ${note.type === 'OFFLINE' ? 'bg-white/10' : bgColor} ${shadowClass} rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] cursor-pointer active:scale-95 transition-transform animate-fade-in`}
                                     onClick={() => handleNotificationClick(note)}
+                                    className={`glass-panel !bg-white/0 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                                 >
-                                    <div className={`w-12 h-12 ${note.type === 'OFFLINE' ? 'bg-white/10' : 'bg-black/20'} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0 invert" style={iconStyle} />
+
+                                    <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
+                                        <img src={iconSrc} className={`${iconClass}`} style={{filter: 'brightness(0) invert(1)'}}/>
                                     </div>
-                                    <div className="flex flex-col justify-center items-start gap-0 flex-1">
+
+                                    <div className="flex flex-col animate-blink justify-center items-start gap-1">
                                         <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
                                             {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
                                         </div>
                                         <div className="text-sm font-medium">
                                             {note.type === 'SIGNAL' ? `CONF: ${(note.confidence*100).toFixed(0)}%` : 'SISTEMA'}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {activeTradesUI.map(trade => {
-                            const tradeAsset = assetsInfo[trade.tabIndex].name;
-                            const isBuy = trade.type === 'BUY';
-                            const bgColor = isBuy ? 'bg-[#10B981]' : 'bg-[#F43F5E]';
-                            const shadowClass = isBuy ? 'shadow-[0_0_20px_rgba(16,185,129,0.20)]' : 'shadow-[0_0_20px_rgba(244,63,94,0.20)]';
-                            const icon = isBuy ? ICONS.trendingUp : ICONS.trendingDown;
-                            const iconStyle = isBuy ? {} : { transform: 'scaleY(-1)' };
-
-                            return (
-                                <div key={trade.id} className="h-[62px] py-2 pl-2 pr-[22px] bg-white/10 rounded-[20px] backdrop-blur-[10px] flex items-center justify-center gap-[10px] animate-fade-in">
-                                    <div className={`w-12 h-12 ${bgColor} ${shadowClass} rounded-[15px] flex items-center justify-center shrink-0`}>
-                                        <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
-                                    </div>
-
-                                    <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
-                                        <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
-                                            {isMobile ? 'OPERACIÓN ABIERTA' : tradeAsset}
-                                        </div>
-
-                                        <div className="flex items-baseline justify-start w-full gap-4">
-                                            <div className="text-white text-sm font-medium font-sans leading-none uppercase">
-                                                {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
-                                            </div>
-                                            <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
-                                                {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -677,103 +807,19 @@
                          </div>
                     </div>
 
-                    <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
-                        <div className="glass-panel p-4 md:p-6">
-                            <div className="flex items-center gap-2 md:gap-4 mb-3 md:mb-4 overflow-x-auto scrollbar-hide">
-                                {assetsInfo.map((asset, idx) => (
-                                    <div
-                                        key={asset.id}
-                                        onClick={() => setActiveTab(idx)}
-                                        className={`tab-item px-3 py-2 flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
-                                            activeTab === idx ? 'bg-white/10' : ''
-                                        }`}
-                                    >
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: asset.color }}></div>
-                                        <span className="text-white text-xs md:text-sm font-medium">{asset.name}</span>
-                                        <span className="text-white/40 text-xs">${priceData[idx].price.toFixed(2)}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-4">
-                                <div className="flex items-center gap-2 px-3 py-2 glass-button order-1 md:order-1">
-                                    <img src={ICONS.activity} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.6)' }} />
-                                    <div className="flex items-center gap-2">
-                                        {durations.map((dur, idx) => (
-                                            <div
-                                                key={dur}
-                                                onClick={() => setCurrentDurationIndex(idx)}
-                                                className={`px-2 py-1 rounded-lg text-xs cursor-pointer transition-all ${
-                                                    currentDurationIndex === idx ? 'bg-white/20 text-white' : 'text-white/40'
-                                                }`}
-                                            >
-                                                {dur}s
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 px-3 py-2 glass-button w-full md:w-auto order-3 md:order-2">
-                                    <img src={ICONS.minus} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.4)' }} />
-                                    <input 
-                                        type="range" 
-                                        min="20" 
-                                        max="500" 
-                                        value={580 - zoom}
-                                        onChange={(e) => { 
-                                            const val = Number(e.target.value); 
-                                            const invertedVal = 580 - val;
-                                            isUserInteractingRef.current = true; 
-                                            zoomTargetRef.current = invertedVal; 
-                                            setZoom(invertedVal); 
-                                        }} 
-                                        className="zoom-slider" 
-                                    />
-                                    <img src={ICONS.plus} className="w-4 h-4" style={{ filter: 'invert(1) opacity(0.4)' }} />
-                                </div>
-
-                                <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">
-                                    <button 
-                                        onClick={() => executeTrade('BUY')} 
-                                        disabled={tradesDisabled || (buttonStates.buy.active && !isMobile)}
-                                        className={`flex-1 md:w-48 h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#15c58b] transition-all ${(tradesDisabled || (buttonStates.buy.active && !isMobile)) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    >
-                                        <img src={ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
-                                        <div className="flex flex-col items-start gap-0 text-black">
-                                            <div className="opacity-60 text-[10px] font-normal">
-                                                {buttonStates.buy.active ? 'OPERACIÓN ABIERTA' : 'OPERAR COMPRA'}
-                                            </div>
-                                            <div className="text-sm font-medium flex items-baseline gap-2">
-                                                <span>{buttonStates.buy.active ? 'COMPRANDO...' : `BUY / ${currentDuration}s.`}</span>
-                                                {buttonStates.buy.active && (
-                                                    <span className="tabular-nums">{buttonStates.buy.timeRemaining.toFixed(1)}s</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </button>
-
-                                    <button 
-                                        onClick={() => executeTrade('SELL')} 
-                                        disabled={tradesDisabled || (buttonStates.sell.active && !isMobile)}
-                                        className={`flex-1 md:w-48 h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-center gap-3 active:scale-95 hover:bg-[#ff5573] transition-all ${(tradesDisabled || (buttonStates.sell.active && !isMobile)) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    >
-                                        <img src={ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
-                                        <div className="flex flex-col items-start gap-0 text-black">
-                                            <div className="opacity-60 text-[10px] font-normal">
-                                                {buttonStates.sell.active ? 'OPERACIÓN ABIERTA' : 'OPERAR VENTA'}
-                                            </div>
-                                            <div className="text-sm font-medium flex items-baseline gap-2">
-                                                <span>{buttonStates.sell.active ? 'VENDIENDO...' : `SELL / ${currentDuration}s.`}</span>
-                                                {buttonStates.sell.active && (
-                                                    <span className="tabular-nums">{buttonStates.sell.timeRemaining.toFixed(1)}s</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </button>
-                                </div>
-
-                            </div>
-                        </div>
+                    <div className="absolute top-6 left-6 md:left-10 z-20 flex items-center gap-3">
+                        <div className="text-xs opacity-60">DURACIÓN</div>
+                        <select 
+                            value={currentDuration} 
+                            onChange={(e) => setCurrentDuration(Number(e.target.value))}
+                            className="glass-button px-3 py-2 text-sm cursor-pointer outline-none"
+                        >
+                            <option value={5}>5s</option>
+                            <option value={10}>10s</option>
+                            <option value={15}>15s</option>
+                            <option value={30}>30s</option>
+                            <option value={60}>60s</option>
+                        </select>
                     </div>
                 </div>
             );

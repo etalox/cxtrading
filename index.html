@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CX Trade - Modern Trading </title>
-    
-    <!-- React & ReactDOM -->
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,16 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
-    /* --- FUENTES --- */
     @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
     @font-face { font-family: 'BDO Grotesk'; src: url('./fonts/BDOGrotesk-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
 
-    /* --- BASE --- */
     * { font-family: 'BDO Grotesk', sans-serif !important; }
     body { margin: 0; background-color: #050505; color: white; overflow: hidden; touch-action: none; }
 
-    /* --- UTILIDADES GLASS --- */
     .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 30px; }
     .glass-button { background: rgba(255, 255, 255, 0.10); border-radius: 20px; transition: all 0.2s ease; }
     .glass-button:active { transform: scale(0.96); }
@@ -30,7 +26,6 @@
     .tab-item { transition: all 0.2s ease; cursor: pointer; border-radius: 16px; }
     .tab-item:hover { background: rgba(255, 255, 255, 0.05); }
 
-    /* --- TOGGLE SWITCH (CORREGIDO) --- */
     .toggle-switch { 
         position: relative; 
         width: 44px; 
@@ -41,19 +36,16 @@
         transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
     }
 
-    /* Hover solo cuando estÃ¡ APAGADO */
     .toggle-switch:not(.active):hover {
         background: rgba(255,255,255,0.3);
     }
 
-    /* ESTADO ACTIVO (ENCENDIDO) */
     .toggle-switch.active { 
         background: #ffffff; 
         /* AnimaciÃ³n de pulso elÃ©ctrico */
         animation: glow-pulse 4s infinite ease-in-out;
     }
 
-    /* LA BOLITA (KNOB) */
     .toggle-knob { 
         position: absolute; 
         top: 2px; 
@@ -66,22 +58,17 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    /* Movimiento y cambio de color del Knob al activar */
     .toggle-switch.active .toggle-knob { 
         transform: translateX(20px); 
         background: #000000; 
     }
 
-    /* --- KEYFRAMES --- */
-    
-    /* AnimaciÃ³n del Switch */
     @keyframes glow-pulse {
         0% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
         50% { box-shadow: 0 0 48px rgba(255, 255, 255, 0.4), 0 0 24px rgba(255,255,255,0.8); } 
         100% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
     }
 
-    /* Animaciones Generales */
     @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
 
@@ -91,7 +78,6 @@
     }
     .animate-blink { animation: blink-fast 1s infinite; }
 
-    /* --- CONTROLES EXTRA --- */
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; background: transparent; cursor: pointer; position: absolute; top: -18px; left: 0; z-index: 20; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 40px; width: 40px; background: transparent; cursor: pointer; }
     .cursor-wait { cursor: wait; }
@@ -149,7 +135,7 @@
                 dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
                 stepBuffer: 0,
                 initialized: false,
-                visualMinPrice: undefined, visualMaxPrice: undefined // Para el suavizado vertical
+                visualMinPrice: undefined, visualMaxPrice: undefined
             });
 
             const marketStatesRef = useRef([createEmptyState(), createEmptyState(), createEmptyState()]);
@@ -170,13 +156,11 @@
                 updateMobile();
                 window.addEventListener('resize', updateMobile);
                 
-                // Visibility Handler
                 const handleVisibilityChange = () => {
                     if (document.hidden) {
                         isTabVisibleRef.current = false;
                     } else {
                         isTabVisibleRef.current = true;
-                        // Al volver, no actualizamos lastLogicTimeRef inmediatamente para forzar el cÃ¡lculo de delta
                     }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -569,33 +553,26 @@
                 if (notification.type === 'SIGNAL') { executeTrade(notification.signalType); }
             };
 
-            // --- GESTIÃ“N DE CONEXIÃ“N A INTERNET ---
             useEffect(() => {
                 const handleOnline = () => {
                     setIsOnline(true);
                     setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
                     
-                    // --- LÃ“GICA DE CATCH-UP AL VOLVER LA RED ---
                     const now = Date.now();
-                    // Calculamos cuÃ¡nto tiempo estuvimos offline
                     const timeMissed = now - lastLogicTimeRef.current;
                     const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
-                    
-                    // Si estuvimos offline menos de ~16 min (10000 ticks), simulamos el paso del tiempo
+
                     if (ticksMissed > 0 && ticksMissed < 10000) { 
-                        // Ejecutamos la lÃ³gica en bucle rÃ¡pido para "rellenar" el hueco
                         for (let i = 0; i < ticksMissed; i++) {
                             runMarketLogic();
                         }
                     } 
-                    // Actualizamos la referencia temporal al presente
                     lastLogicTimeRef.current = now; 
                 };
                 
                 const handleOffline = () => {
                     setIsOnline(false);
                     addNotification({ type: 'OFFLINE' });
-                    // No tocamos lastLogicTimeRef aquÃ­ para que se quede "congelado" en el momento de la desconexiÃ³n
                 };
 
                 window.addEventListener('online', handleOnline);
@@ -607,16 +584,13 @@
                 };
             }, [addNotification]);
             
-            // --- MAIN LOOP UNIFICADO ---
             useEffect(() => {
                 let animationId;
                 const LOGIC_RATE_MS = 1000 / TICK_RATE;
                 
-                // Usamos referencias mutables para mantener estado entre frames
                 const lastLogicTimeRef = { current: Date.now() };
                 const isTabVisibleRef = { current: !document.hidden };
 
-                // LÃ³gica del Mercado (Reutilizable)
                 const runMarketLogic = () => {
                     processMarketLogic(0); updateVisualCandleLogic(0);
                     processMarketLogic(1); updateVisualCandleLogic(1);
@@ -635,22 +609,17 @@
                     }
                 };
 
-                // FunciÃ³n de Catch-up (Relleno de tiempo perdido)
                  const performCatchUp = () => {
                     const now = Date.now();
                     const timeMissed = now - lastLogicTimeRef.current;
                     const ticksMissed = Math.floor(timeMissed / LOGIC_RATE_MS);
                     
-                    // Si perdimos tiempo (pero no una eternidad > 15 min)
                     if (ticksMissed > 0 && ticksMissed < 10000) {
-                        // Ejecutamos la lÃ³gica N veces instantÃ¡neamente
                         for (let i = 0; i < ticksMissed; i++) {
                             runMarketLogic();
                         }
-                        // Avanzamos el reloj lÃ³gico para que coincida con el ahora
                         lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
                     } else if (ticksMissed >= 10000) {
-                        // Si pasÃ³ demasiado tiempo, simplemente reseteamos (teletransporte)
                         lastLogicTimeRef.current = now;
                     }
 
@@ -664,14 +633,11 @@
                             runMarketLogic();
                         }
                         
-                        // --- CORRECCIÃ“N CLAVE ---
-                        // Forzamos la actualizaciÃ³n inmediata del scroll para que la cÃ¡mara salte a las nuevas velas
-                        // Aplicamos esto a las 3 pestaÃ±as para que no se descuadren
                         [0, 1, 2].forEach(idx => {
                             const s = marketStatesRef.current[idx];
                             s.targetScroll = s.candles.length; 
-                            s.scrollOffset = s.candles.length; // Salto instantÃ¡neo, sin suavizado
-                            s.visualValue = s.currentValue; // Sincronizar valor visual con lÃ³gico
+                            s.scrollOffset = s.candles.length;
+                            s.visualValue = s.currentValue;
                         });
                         
                         lastLogicTimeRef.current += ticksMissed * LOGIC_RATE_MS;
@@ -682,7 +648,6 @@
 
                 };
 
-                // Listeners de Eventos
                 const handleVisibilityChange = () => {
                     isTabVisibleRef.current = !document.hidden;
                     if (isTabVisibleRef.current && navigator.onLine) {
@@ -694,43 +659,30 @@
                     setIsOnline(true);
                     setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE'));
                     if (isTabVisibleRef.current) {
-                        performCatchUp(); // <--- AQUÃ ESTÃ LA MAGIA QUE FALTABA
+                        performCatchUp();
                     }
                 };
 
                 const handleOffline = () => {
                     setIsOnline(false);
                     addNotification({ type: 'OFFLINE' });
-                    // No actualizamos lastLogicTimeRef, dejamos que se quede atrÃ¡s
                 };
 
                 document.addEventListener("visibilitychange", handleVisibilityChange);
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
 
-                // LOOP PRINCIPAL (DIBUJO + LÃ“GICA)
                 const loop = () => {
-                    animationId = requestAnimationFrame(loop);
-                    
+                    animationId = requestAnimationFrame(loop);      
                     const now = Date.now();
-                    
-                    // Si estamos offline o minimizados, NO corremos lÃ³gica ni dibujo
-                    // Esto "congela" el lastLogicTimeRef en el pasado
                     if (!navigator.onLine || !isTabVisibleRef.current) return;
-
-                    // LÃ³gica Normal (Paso a paso)
                     const deltaTime = now - lastLogicTimeRef.current;
                     if (deltaTime >= LOGIC_RATE_MS) {
                         const ticksToProcess = Math.floor(deltaTime / LOGIC_RATE_MS);
-                        // LÃ­mite de seguridad por si el frame rate cae mucho
-                        const safeTicks = Math.min(ticksToProcess, 10); 
-                        
+                        const safeTicks = Math.min(ticksToProcess, 10);
                         for (let i = 0; i < safeTicks; i++) {
-                            runMarketLogic();
-                        }
-                        lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;
-                        
-                        // Procesar Trades Expirados
+                            runMarketLogic();}
+                        lastLogicTimeRef.current += safeTicks * LOGIC_RATE_MS;    
                         const realNow = Date.now();
                         const expiredTrades = activeTradesRef.current.filter(t => realNow >= t.expiryTime);
                         if (expiredTrades.length > 0) {
@@ -755,7 +707,6 @@
                         }
                     }
 
-                    // Renderizado (UI Updates)
                     const state = marketStatesRef.current[activeTab]; 
                     if (now - lastUIUpdateRef.current >= UI_UPDATE_RATE_MS) {
                         setCurrentPriceUI(state.visualValue);
@@ -763,8 +714,6 @@
                         lastUIUpdateRef.current = now;
                     }
 
-                    // --- AQUI VA TU CÃ“DIGO DE CANVAS / DIBUJO ---
-                    // (Pega aquÃ­ todo el bloque 'const canvas = canvasRef.current ...' hasta el final del dibujo)
                     const canvas = canvasRef.current;
                     if (canvas) {
                          const dpr = window.devicePixelRatio || 1;
@@ -907,9 +856,7 @@
                         resultLabelsRef.current.forEach(label => {
                             const age = Date.now() - label.timestamp;
                             const progress = age / 2000;
-                            
-                            // LÃ“GICA DE DIRECCIÃ“N
-                            // Si es WIN (profit > 0), sube (-50). Si es LOSS, baja (+50).
+
                             const direction = label.profit > 0 ? -1 : 1;
                             const yPos = getY(label.price) - 30 + (progress * 50 * direction); 
                             const xPos = getX(label.xIndex);
@@ -948,7 +895,7 @@
                 };
                 
                 lastLogicTimeRef.current = Date.now();
-                loop(); // Iniciamos el loop unificado
+                loop();
 
                 return () => {
                     cancelAnimationFrame(animationId);
@@ -986,7 +933,6 @@
             const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= maxTrades;
 
             return (
-                // Usamos estilo inline o clase arbitraria de Tailwind para dvh
             <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
                     <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
                         <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
@@ -997,7 +943,7 @@
                             <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
                         </div>
 
-                        {/* --- TABS ESTILO CAJA --- */}
+                        { }
                         <div className="hidden md:flex items-center gap-[10px] pointer-events-auto">
                             {assetsInfo.map((info, idx) => {
                                 const isActive = activeTab === idx;
@@ -1097,19 +1043,19 @@
                                     <img src={icon} className="w-5 h-5 brightness-0" style={iconStyle} />
                                 </div>
                                 
-                                {/* Contenedor de Textos (Ocupa el resto del espacio) */}
+                                { }
                                 <div className="flex flex-col justify-center items-start gap-1.5 flex-1">
                                     {/* Etiqueta superior */}
                                     <div className="opacity-80 text-white/50 text-[10px] font-normal font-sans leading-none">
                                         {isMobile ? 'OPERACIÃ“N ABIERTA' : tradeAsset}
                                     </div>
                                     
-                                    {/* Fila Inferior: Estado + Contador alineados */}
+                                    { }
                                     <div className="flex items-baseline justify-start w-full gap-4">
                                         <div className="text-white text-sm font-medium font-sans leading-none uppercase">
                                             {isBuy ? 'COMPRANDO...' : 'VENDIENDO...'}
                                         </div>
-                                        {/* Contador movido aquÃ­ dentro */}
+                                        { }
                                         <div className="text-white text-sm font-medium font-sans leading-none tabular-nums">
                                             {(Math.max(0, (trade.expiryTime - Date.now()) / 1000)).toFixed(1)}s
                                         </div>
@@ -1134,8 +1080,7 @@
                         <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                             
                             <button 
-                                onClick={handleGenerateAsset} 
-                                // Se desactiva si estÃ¡ generando O si no hay internet
+                                onClick={handleGenerateAsset}
                                 disabled={isGenerating || !isOnline}
                                 className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-center gap-3 hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
@@ -1180,15 +1125,14 @@
                                     style={{ left: `${100 - sliderPercentage}%` }} 
                                 ></div>
 
-                                {/* Input invisible pero funcional (Invertido) */}
+                                { }
                                 <input 
                                     type="range" 
                                     min="80" 
                                     max="500" 
                                     value={580 - zoom} 
                                     onChange={(e) => { 
-                                        const val = Number(e.target.value); 
-                                        // Invertimos: Mover a la derecha (valor alto) reduce el zoom numÃ©rico (Zoom In visual)
+                                        const val = Number(e.target.value);
                                         const invertedVal = 580 - val;
                                         isUserInteractingRef.current = true; 
                                         zoomTargetRef.current = invertedVal; 

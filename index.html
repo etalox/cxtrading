@@ -847,7 +847,11 @@
                         resultLabelsRef.current.forEach(label => {
                             const age = Date.now() - label.timestamp;
                             const progress = age / 2000;
-                            const yPos = getY(label.price) - 30 - (progress * 50); 
+                            
+                            // LÓGICA DE DIRECCIÓN
+                            // Si es WIN (profit > 0), sube (-50). Si es LOSS, baja (+50).
+                            const direction = label.profit > 0 ? -1 : 1;
+                            const yPos = getY(label.price) - 30 + (progress * 50 * direction); 
                             const xPos = getX(label.xIndex);
                             const opacity = 1 - Math.pow(progress, 3); 
                             ctx.globalAlpha = opacity;

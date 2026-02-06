@@ -35,12 +35,12 @@
             background: rgba(255,255,255,0.2); 
             border-radius: 12px; 
             cursor: pointer; 
-            transition: all 0.3s; /* Transition all para suavizar color */
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Transición suave */
         }
         
-        .toggle-switch.active { 
-            background: #ffffff; /* Fondo blanco al activar */
-            animation: pulse-border 2s infinite; /* Animación opcional de brillo */
+        .toggle-switch.active .toggle-knob { 
+            transform: translateX(20px); 
+            background: #000000; /* Knob negro */
         }
         
         .toggle-knob { 
@@ -49,23 +49,30 @@
             left: 2px; 
             width: 20px; 
             height: 20px; 
-            background: #ffffff; /* Knob blanco por defecto */
+            background: #ffffff; 
             border-radius: 50%; 
-            transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); /* Bezier para movimiento suave */
+            transition: transform 0.3s, background 0.3s; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
         /* ESTADO ACTIVO */
-        .toggle-switch.active .toggle-knob { 
-            transform: translateX(20px); 
-            background: #000000; /* Knob negro al activar */
+        .toggle-switch.active { 
+            background: #ffffff; 
+            /* Sombra inicial al encenderse */
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); 
+            /* Animación continua del brillo */
+            animation: glow-pulse 2s infinite ease-in-out;
         }
 
-        /* ANIMACIÓN DE PARPADEO (BLINK) */
-        /* Si quieres que TODO el switch parpadee */
-        @keyframes blink-soft {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+        .toggle-switch:not(.active):hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* ANIMACIÓN DE RESPLANDOR (GLOW) */
+        @keyframes glow-pulse {
+            0% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(255, 255, 255, 0.9); } /* Brillo máximo */
+            100% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
         }
         
         .toggle-switch.active {

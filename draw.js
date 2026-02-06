@@ -136,18 +136,17 @@ window.draw = {
                 context.shadowBlur = 0;
             });
 
-            // FIX 3: Trade entry markers use entryCandleIndex which is relative to current scroll
+            // FIX 3: Trade entry markers use time-based offset from current position
+            // This makes positioning robust against density changes
             activeTrades.forEach(trade => {
                 const yEntry = getY(trade.entryPrice);
 
-                // Use entryCandleIndex stored at trade creation (relative to candles array at that time)
-                // Calculate current position accounting for any candle trimming
-                const entryCandleIndex = trade.entryCandleIndex !== undefined
-                    ? trade.entryCandleIndex
-                    : (trade.entryTickIndex !== undefined
-                        ? trade.entryTickIndex / state.ticksPerCandle
-                        : trade.entryIndex);
-
+                // Calculate entry position based on elapsed time since trade started
+                // This approach survives density changes and candle rebuilds
+                const elapsedSeconds = (Date.now() - trade.startTime) / 1000;
+                const elapsedTicks = elapsedSeconds * 2; // TICK_RATE 2
+                const entryCandleOffset = elapsedTicks / state.ticksPerCandle;
+                const entryCandleIndex = currentCandleIndex - entryCandleOffset;
                 const xEntry = getX(entryCandleIndex);
 
                 const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;

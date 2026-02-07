@@ -143,45 +143,58 @@ window.generator = {
     },
 
     generateAssetForTab: (tabIndex, ctx) => {
-        const now = Date.now();
-        ctx.assetHistoryRef.current = ctx.assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
-        let attempts = 0; let selectedName = ""; let matIdx, adjIdx;
-        const findAvailableAsset = () => {
-            while (attempts < 100) {
-                attempts++;
-                const matRand = (Math.random() + Math.random()) / 2;
-                const adjRand = (Math.random() + Math.random()) / 2;
-                const mIdx = Math.floor(matRand * window.MATERIALS.length);
-                const aIdx = Math.floor(adjRand * window.ADJECTIVES.length);
-                const fullName = `${window.MATERIALS[mIdx]} ${window.ADJECTIVES[aIdx]}`;
-                const isCurrentlyActive = ctx.assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
-                const inHistory = ctx.assetHistoryRef.current.some(a => a.name === fullName);
-                if (!isCurrentlyActive && !inHistory) {
-                    selectedName = fullName; matIdx = mIdx; adjIdx = aIdx;
-                    ctx.assetHistoryRef.current.push({ name: fullName, timestamp: now });
-                    return true;
-                }
-            }
-            return false;
-        };
-        if (!findAvailableAsset()) { setTimeout(() => window.generator.generateAssetForTab(tabIndex, ctx), 500); return; }
-        const rand = Math.pow(Math.random(), 2.5);
-        const newBasePrice = 1000 + (1 - rand) * 99000;
-        const dna = window.generator.generateDNAFromName(matIdx, adjIdx);
-        let preferredDurations;
-        if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; }
-        else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; }
-        else { preferredDurations = [5000, 10000, 15000, 30000]; }
-        const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
-        ctx.tickHistoriesRef.current[tabIndex] = [];
-        ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
-        ctx.marketStatesRef.current[tabIndex] = { ...window.generator.createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
+        ctx.setIsGenerating(true);
 
-        const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15;
-        window.generator.warmUpMarket(tabIndex, ctx, randomWarmupMinutes);
-        ctx.setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
-        if (tabIndex === ctx.activeTab) { ctx.setCurrentDuration(randomDuration / 1000); }
-        ctx.setIsGenerating(false);
+        // Yield to allow UI update before heavy CPU task
+        setTimeout(() => {
+            const now = Date.now();
+            ctx.assetHistoryRef.current = ctx.assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
+            let attempts = 0; let selectedName = ""; let matIdx, adjIdx;
+            const findAvailableAsset = () => {
+                while (attempts < 100) {
+                    attempts++;
+                    const matRand = (Math.random() + Math.random()) / 2;
+                    const adjRand = (Math.random() + Math.random()) / 2;
+                    const mIdx = Math.floor(matRand * window.MATERIALS.length);
+                    const aIdx = Math.floor(adjRand * window.ADJECTIVES.length);
+                    const fullName = `${window.MATERIALS[mIdx]} ${window.ADJECTIVES[aIdx]}`;
+                    const isCurrentlyActive = ctx.assetsInfo.some((info, i) => i !== tabIndex && info.name === fullName);
+                    const inHistory = ctx.assetHistoryRef.current.some(a => a.name === fullName);
+                    if (!isCurrentlyActive && !inHistory) {
+                        selectedName = fullName; matIdx = mIdx; adjIdx = aIdx;
+                        ctx.assetHistoryRef.current.push({ name: fullName, timestamp: now });
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            if (!findAvailableAsset()) {
+                // If failed, retry LATER but keep isGenerating true
+                setTimeout(() => window.generator.generateAssetForTab(tabIndex, ctx), 500);
+                return;
+            }
+
+            const rand = Math.pow(Math.random(), 2.5);
+            const newBasePrice = 1000 + (1 - rand) * 99000;
+            const dna = window.generator.generateDNAFromName(matIdx, adjIdx);
+            let preferredDurations;
+            if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; }
+            else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; }
+            else { preferredDurations = [5000, 10000, 15000, 30000]; }
+            const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
+            ctx.tickHistoriesRef.current[tabIndex] = [];
+            ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
+            ctx.marketStatesRef.current[tabIndex] = { ...window.generator.createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
+
+            const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15;
+            window.generator.warmUpMarket(tabIndex, ctx, randomWarmupMinutes);
+            ctx.setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
+            if (tabIndex === ctx.activeTab) { ctx.setCurrentDuration(randomDuration / 1000); }
+
+            // Success! Reset state
+            ctx.setIsGenerating(false);
+        }, 100);
     },
 
     rebuildCandles: (tabIndex, ctx) => {

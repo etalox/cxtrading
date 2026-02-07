@@ -58,7 +58,7 @@ window.UI = {
                 let iconStyle = {};
                 if (note.type === 'SIGNAL') {
                     iconSrc = note.signalType === 'BUY' ? window.ICONS.activityWin : window.ICONS.activityLoss;
-                    iconStyle = { filter: note.signalType === 'BUY' ? 'brightness(0) saturate(100%) invert(63%) sepia(83%) saturate(417%) hue-rotate(95deg) brightness(96%) contrast(86%)' : 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(2636%) hue-rotate(331deg) brightness(96%) contrast(96%)', transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
+                    iconStyle = { transform: note.signalType === 'SELL' ? 'scaleY(-1)' : 'none' };
                 }
                 return (
                     <div
@@ -67,7 +67,7 @@ window.UI = {
                         className={`glass-panel !bg-white/0 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                     >
                         <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
-                            <img src={iconSrc} className="w-5 h-5" style={{ ...iconStyle, filter: note.type === 'SIGNAL' ? iconStyle.filter : 'brightness(0) invert(1)' }} />
+                            <img src={iconSrc} className="w-5 h-5" style={{ ...iconStyle, filter: 'brightness(0) invert(1)' }} />
                         </div>
                         <div className="flex flex-col animate-blink justify-center items-start gap-1">
                             <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">

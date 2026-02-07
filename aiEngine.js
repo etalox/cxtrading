@@ -71,7 +71,7 @@ window.aiEngine = {
                     ctx.addNotification({ type: 'SIGNAL', signalType: signalType, confidence: confidence, price: newPrice });
                     state.lastSignalTick = state.currentValue;
                     state.lastSignalTime = Date.now();
-                    if (ctx.autopilot && confidence > 0.65 && ctx.activeTradesRef.current.length === 0) {
+                    if (ctx.autopilot && confidence > 0.4 && ctx.activeTradesRef.current.length === 0) {
                         const currentSignal = `${signalType}_${newPrice.toFixed(2)}`;
                         if (ctx.lastSignalRef.current !== currentSignal) {
                             ctx.lastSignalRef.current = currentSignal;

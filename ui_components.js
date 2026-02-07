@@ -118,7 +118,7 @@ window.UI = {
                             <div className={`toggle-switch ${autopilot ? 'active' : ''}`}><div className="toggle-knob"></div></div>
                             <div className="flex flex-col items-start gap-1">
                                 <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
-                                <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ACTIVO' : 'INACTIVO'}</div>
+                                <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ON' : 'OFF'}</div>
                             </div>
                         </div>
                     )}

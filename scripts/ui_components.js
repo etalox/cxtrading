@@ -74,7 +74,7 @@ window.UI = {
                                 {note.type === 'SIGNAL' ? 'SIGNAL' : 'NOTIFICACIÓN'}
                             </div>
                             <div className="text-sm font-medium">
-                                {note.type === 'SIGNAL' ? `${note.signalType}: ${(note.confidence * 100).toFixed(0)}%` : 'SISTEMA'}
+                                {note.type === 'SIGNAL' ? `${note.signalType} - CONF. ${(note.confidence * 100).toFixed(0)}%` : 'SISTEMA'}
                             </div>
                         </div>
                     </div>

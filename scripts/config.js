@@ -10,7 +10,7 @@ window.CONFIG = {
     // Rendering Smoothing
     SMOOTHING: 0.05,
     VERTICAL_SMOOTHING: 0.05,
-    PRICE_SMOOTHING: 0.3,
+    PRICE_SMOOTHING: 0.25,
 
     // Chart Layout - Desktop
     Y_RANGE_PADDING: 0.40,
@@ -22,6 +22,6 @@ window.CONFIG = {
 
     // Zoom Controls
     ZOOM_MIN: 80,
-    ZOOM_MAX: 640,
+    ZOOM_MAX: 500,
     ZOOM_DEFAULT: 160
 };

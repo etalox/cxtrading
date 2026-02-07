@@ -82,11 +82,19 @@ const MarketSim = () => {
             isMobile: isMobileRef
         });
 
+        const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
+            marketStatesRef,
+            activeTab,
+            zoomCurrentRef,
+            isUserInteracting: isUserInteractingRef
+        });
+
         return () => {
             window.removeEventListener('resize', updateMobile);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (cleanupInteractions) cleanupInteractions();
             if (cleanupResize) cleanupResize();
+            if (cleanupDrag) cleanupDrag();
         };
     }, []);
 
@@ -238,7 +246,7 @@ const MarketSim = () => {
             if (deltaTime >= window.CONFIG.LOGIC_RATE_MS) {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
-                if (safeTicks > 1) [0, 1, 2].forEach(idx => { marketStatesRef.current[idx].targetScroll = marketStatesRef.current[idx].candles.length; marketStatesRef.current[idx].scrollOffset = marketStatesRef.current[idx].candles.length; });
+                if (safeTicks > 1 && !isUserInteractingRef.current) [0, 1, 2].forEach(idx => { marketStatesRef.current[idx].targetScroll = marketStatesRef.current[idx].candles.length; marketStatesRef.current[idx].scrollOffset = marketStatesRef.current[idx].candles.length; });
                 lastLogicTimeRef.current += safeTicks * window.CONFIG.LOGIC_RATE_MS;
 
                 const realNow = Date.now();

@@ -117,8 +117,9 @@ window.generator = {
                 low: Math.min(...state.visualTicks, lastCandleClose),
                 color: close >= lastCandleClose ? '#10b981' : '#f43f5e'
             };
+            const isAtEnd = state.targetScroll >= state.candles.length - 1.1;
             state.candles.push(newCandle);
-            state.targetScroll = state.candles.length;
+            if (isAtEnd) state.targetScroll = state.candles.length;
             state.visualTicks = [];
 
             const MAX_CANDLES = 600;

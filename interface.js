@@ -84,6 +84,89 @@ window.Interface = {
         };
     },
 
+    setupHorizontalDrag: (container, canvas, refs) => {
+        if (!container || !canvas) return;
+
+        let isDragging = false;
+        let startX = 0;
+        let startTargetScroll = 0;
+
+        const handleStart = (clientX, target) => {
+            if (window.Interface.isInteractive(target)) return;
+            isDragging = true;
+            startX = clientX;
+            const state = refs.marketStatesRef.current[refs.activeTab];
+            startTargetScroll = state.targetScroll;
+            refs.isUserInteracting.current = true;
+        };
+
+        const handleMove = (clientX) => {
+            if (!isDragging) return;
+            const deltaX = clientX - startX;
+            const state = refs.marketStatesRef.current[refs.activeTab];
+
+            // Calculate candle width (consistent with draw.js)
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.width / dpr;
+            const candleWidth = (width / refs.zoomCurrentRef.current) * (state.ticksPerCandle / 4);
+
+            // Convert pixel delta to candle index delta
+            const candleDelta = deltaX / candleWidth;
+
+            // Update targetScroll (dragging left moves chart right, so index decreases)
+            const newTarget = startTargetScroll - candleDelta;
+
+            // Limit scroll: Left extreme (0) to Right extreme (candles.length)
+            state.targetScroll = Math.max(0, Math.min(state.candles.length, newTarget));
+
+            // If the user drags away from the end, we consider them interacting
+            if (state.targetScroll < state.candles.length - 0.1) {
+                refs.isUserInteracting.current = true;
+            } else {
+                // If they drag back to the very end, we can resume auto-scroll later
+                // refs.isUserInteracting.current = false; // Optional: snap back to auto-follow
+            }
+        };
+
+        const handleEnd = () => {
+            isDragging = false;
+        };
+
+        const onMouseDown = (e) => handleStart(e.clientX, e.target);
+        const onMouseMove = (e) => handleMove(e.clientX);
+        const onMouseUp = () => handleEnd();
+
+        const onTouchStart = (e) => {
+            if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.target);
+        };
+        const onTouchMove = (e) => {
+            if (e.touches.length === 1 && isDragging) {
+                handleMove(e.touches[0].clientX);
+                // Prevent browser back/forward gestures while dragging the chart
+                if (Math.abs(e.touches[0].clientX - startX) > 5) e.preventDefault();
+            }
+        };
+        const onTouchEnd = () => handleEnd();
+
+        container.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
+        container.addEventListener('touchstart', onTouchStart, { passive: false });
+        container.addEventListener('touchmove', onTouchMove, { passive: false });
+        container.addEventListener('touchend', onTouchEnd);
+
+        return () => {
+            container.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            container.removeEventListener('touchstart', onTouchStart);
+            container.removeEventListener('touchmove', onTouchMove);
+            container.removeEventListener('touchend', onTouchEnd);
+        };
+    },
+
     setupResizeObserver: (container, canvas, refs) => {
         if (!container || !canvas) return;
 

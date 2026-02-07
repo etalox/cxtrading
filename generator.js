@@ -143,6 +143,7 @@ window.generator = {
     },
 
     generateAssetForTab: (tabIndex, ctx) => {
+        const startTime = Date.now();
         ctx.setIsGenerating(true);
 
         // Yield to allow UI update before heavy CPU task
@@ -192,9 +193,11 @@ window.generator = {
             ctx.setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
             if (tabIndex === ctx.activeTab) { ctx.setCurrentDuration(randomDuration / 1000); }
 
-            // Success! Reset state
-            ctx.setIsGenerating(false);
-        }, 100);
+            // Ensure minimum 600ms of "Searching" state for premium feel
+            const elapsed = Date.now() - startTime;
+            const wait = Math.max(0, 600 - elapsed);
+            setTimeout(() => ctx.setIsGenerating(false), wait);
+        }, 50);
     },
 
     rebuildCandles: (tabIndex, ctx) => {

@@ -318,7 +318,7 @@ const MarketSim = () => {
 
             <window.UI.BottomControls
                 isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
-                handleGenerateAsset={() => { if (!isGenerating) { setTimeout(() => window.generator.generateAssetForTab(activeTab, getContext()), 100); } }}
+                handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}

@@ -140,7 +140,7 @@ window.UI = {
                             disabled={tradesDisabled}
                             style={{
                                 opacity: buyRemaining > 0 ? 1 : (autopilot ? 0.5 : (tradesDisabled ? 0.5 : buyButtonOpacity)),
-                                transition: 'background-color 400ms, transform 0.1s ease'
+                                transition: 'background-color 400ms, opacity 100ms, transform 0.1s ease'
                             }}
                             className={`flex-1 md:w-[192px] h-16 ${autopilot ? 'bg-white' : 'bg-[#10B981]'} rounded-[20px] ${buyRemaining > 0 && autopilot ? 'animate-glow-active' : (autopilot ? '' : 'shadow-[0_0_20px_rgba(16,185,129,0.2)]')} flex items-center justify-start pl-[28px] gap-3 active:scale-95 ${autopilot ? 'hover:bg-white/90' : 'hover:bg-[#15c58b]'} select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >
@@ -158,7 +158,7 @@ window.UI = {
                             disabled={tradesDisabled}
                             style={{
                                 opacity: sellRemaining > 0 ? 1 : (autopilot ? 0.5 : (tradesDisabled ? 0.5 : sellButtonOpacity)),
-                                transition: 'background-color 400ms, transform 0.1s ease'
+                                transition: 'background-color 400ms, opacity 100ms, transform 0.1s ease'
                             }}
                             className={`flex-1 md:w-[192px] h-16 ${autopilot ? 'bg-white' : 'bg-[#F43F5E]'} rounded-[20px] ${sellRemaining > 0 && autopilot ? 'animate-glow-active' : (autopilot ? '' : 'shadow-[0_0_20px_rgba(244,63,94,0.2)]')} flex items-center justify-start pl-[28px] gap-3 active:scale-95 ${autopilot ? 'hover:bg-white/90' : 'hover:bg-[#ff5573]'} select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >

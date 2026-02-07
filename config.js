@@ -12,9 +12,13 @@ window.CONFIG = {
     VERTICAL_SMOOTHING: 0.05,
     PRICE_SMOOTHING: 0.3,
 
-    // Chart Layout
+    // Chart Layout - Desktop
     Y_RANGE_PADDING: 0.45,
     ANCHOR_DEFAULT: 0.75,
+
+    // Chart Layout - Mobile
+    Y_RANGE_PADDING_MOBILE: 0.45,
+    ANCHOR_DEFAULT_MOBILE: 0.75,
 
     // Zoom Controls
     ZOOM_MIN: 80,

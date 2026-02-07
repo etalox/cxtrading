@@ -5,7 +5,7 @@ window.generator = {
         structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30,
         currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50,
         ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0,
-        currentAnchor: window.CONFIG.ANCHOR_DEFAULT, tradeDuration: 10000,
+        currentAnchor: undefined, tradeDuration: 10000,
         dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
         stepBuffer: 0,
         initialized: false,

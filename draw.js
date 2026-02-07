@@ -12,6 +12,9 @@ window.draw = {
             const activeTrades = ctx.activeTradesRef.current.filter(t => t.tabIndex === ctx.activeTab);
 
             const conf = window.CONFIG;
+            const isSmall = width < 768;
+            const anchorDefault = isSmall ? conf.ANCHOR_DEFAULT_MOBILE : conf.ANCHOR_DEFAULT;
+            const yPadding = isSmall ? conf.Y_RANGE_PADDING_MOBILE : conf.Y_RANGE_PADDING;
 
             // Price and Scroll Smoothing
             state.visualValue += (state.currentValue - state.visualValue) * conf.PRICE_SMOOTHING;
@@ -45,13 +48,13 @@ window.draw = {
 
             const candleWidth = (width / ctx.zoomCurrentRef.current) * (state.ticksPerCandle / 4);
 
-            let targetAnchorPercent = conf.ANCHOR_DEFAULT;
+            let targetAnchorPercent = anchorDefault;
             if (activeTrades.length > 0) {
                 const maxDuration = Math.max(...activeTrades.map(t => t.duration));
                 if (maxDuration >= 30000) targetAnchorPercent = 0.50;
                 else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
             }
-            if (typeof state.currentAnchor === 'undefined') state.currentAnchor = conf.ANCHOR_DEFAULT;
+            if (typeof state.currentAnchor === 'undefined') state.currentAnchor = anchorDefault;
             state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * conf.SMOOTHING;
             const anchorX = width * state.currentAnchor;
 
@@ -66,7 +69,7 @@ window.draw = {
 
             if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
             const rawRange = maxPrice - minPrice || 10;
-            const targetPadding = rawRange * conf.Y_RANGE_PADDING;
+            const targetPadding = rawRange * yPadding;
             const targetMin = minPrice - targetPadding;
             const targetMax = maxPrice + targetPadding;
 

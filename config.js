@@ -5,7 +5,19 @@ window.CONFIG = {
     TICK_HISTORY_LIMIT: 100,
     LOGIC_RATE_MS: 1000 / 2, // 1000 / TICK_RATE
     DURATIONS: [5000, 10000, 15000, 30000],
-    MAX_CANDLES: 600,
+    MAX_CANDLES: 999,
+
+    // Rendering Smoothing
     SMOOTHING: 0.05,
-    VERTICAL_SMOOTHING: 0.05
+    VERTICAL_SMOOTHING: 0.05,
+    PRICE_SMOOTHING: 0.3,
+
+    // Chart Layout
+    Y_RANGE_PADDING: 0.45,
+    ANCHOR_DEFAULT: 0.75,
+
+    // Zoom Controls
+    ZOOM_MIN: 80,
+    ZOOM_MAX: 500,
+    ZOOM_DEFAULT: 160
 };

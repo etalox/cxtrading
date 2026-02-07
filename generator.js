@@ -5,7 +5,7 @@ window.generator = {
         structPhase: 'UP', structTimer: 0, structPeriodX: 30, currentStructLimit: 30,
         currentProb: 0.5, targetProb: 0.5, probStep: 0, cycleCounter: 0, cycleDuration: 50,
         ticksPerCandle: 4, targetScroll: 0, scrollOffset: 0, lastSignalTick: 0, verticalShift: 0,
-        currentAnchor: 0.75, tradeDuration: 10000,
+        currentAnchor: window.CONFIG.ANCHOR_DEFAULT, tradeDuration: 10000,
         dna: { volatility: 1, aggression: 0.3, structure: 0.5, trendBias: 0, isStepped: false },
         stepBuffer: 0,
         initialized: false,
@@ -41,7 +41,7 @@ window.generator = {
                 if (Math.random() < dna.structure) {
                     state.patternState = 'STRUCTURED';
                     state.structTotalDuration = Math.floor(180 + Math.random() * 300);
-                    state.structPeriodX = Math.floor((15 + Math.random() * 25) * 2); // TICK_RATE hardcoded to 2
+                    state.structPeriodX = Math.floor((15 + Math.random() * 25) * window.CONFIG.TICK_RATE);
                     state.structPhase = Math.random() > 0.5 ? 'UP' : 'DOWN';
                     state.structTimer = 0;
                     state.currentStructLimit = state.structPeriodX;
@@ -64,7 +64,7 @@ window.generator = {
             if (state.structTimer >= state.currentStructLimit) {
                 state.structPhase = state.structPhase === 'UP' ? 'DOWN' : 'UP';
                 state.structTimer = 0;
-                state.currentStructLimit = Math.floor((10 + Math.random() * 40) * 2); // TICK_RATE 2
+                state.currentStructLimit = Math.floor((10 + Math.random() * 40) * window.CONFIG.TICK_RATE);
             }
             drift = state.structPhase === 'UP' ? 0.18 : -0.18;
             volatilityMult = 1.0;
@@ -97,7 +97,7 @@ window.generator = {
         } else {
             const tickHistory = ctx.tickHistoriesRef.current[tabIndex];
             tickHistory.push(state.currentValue);
-            if (tickHistory.length > 100) tickHistory.shift();
+            if (tickHistory.length > window.CONFIG.TICK_HISTORY_LIMIT) tickHistory.shift();
         }
     },
 
@@ -122,9 +122,8 @@ window.generator = {
             if (isAtEnd) state.targetScroll = state.candles.length;
             state.visualTicks = [];
 
-            const MAX_CANDLES = 600;
-            if (state.candles.length > MAX_CANDLES) {
-                const deleteCount = state.candles.length - MAX_CANDLES;
+            if (state.candles.length > window.CONFIG.MAX_CANDLES) {
+                const deleteCount = state.candles.length - window.CONFIG.MAX_CANDLES;
                 state.candles.splice(0, deleteCount);
                 state.scrollOffset -= deleteCount;
                 state.targetScroll -= deleteCount;
@@ -134,7 +133,7 @@ window.generator = {
 
     warmUpMarket: (tabIndex, ctx, minutes = 10) => {
         const state = ctx.marketStatesRef.current[tabIndex];
-        const ticksToSimulate = minutes * 60 * 2; // TICK_RATE 2
+        const ticksToSimulate = minutes * 60 * window.CONFIG.TICK_RATE;
         for (let i = 0; i < ticksToSimulate; i++) {
             window.generator.processMarketLogic(tabIndex, ctx, true);
             window.generator.updateVisualCandleLogic(tabIndex, ctx);
@@ -180,7 +179,7 @@ window.generator = {
             let preferredDurations;
             if (dna.volatility > 1.2 || dna.aggression > 0.6) preferredDurations = [5000, 5000, 10000];
             else if (dna.structure > 0.7) preferredDurations = [15000, 30000, 30000];
-            else preferredDurations = [5000, 10000, 15000, 30000];
+            else preferredDurations = window.CONFIG.DURATIONS;
 
             const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
             ctx.tickHistoriesRef.current[tabIndex] = [];
@@ -201,7 +200,6 @@ window.generator = {
                     return next;
                 });
                 if (tabIndex === ctx.activeTab) ctx.setCurrentDuration(randomDuration / 1000);
-                // Final state reset ALWAYS after minimum 400ms or actual work time
                 ctx.setIsGenerating(false);
             }, wait);
         }, 30);

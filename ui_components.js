@@ -126,7 +126,7 @@ window.UI = {
                     <div className="w-full md:w-[160px] h-4 relative mt-2 md:mt-0 mb-2 md:mb-0 px-0 order-3 md:order-3">
                         <div className="w-full h-[2px] bg-[#333] rounded-full absolute top-1/2 transform -translate-y-1/2"></div>
                         <div className="absolute top-1/2 transform -translate-y-1/2 h-3 w-0.5 bg-white pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ left: `${100 - sliderPercentage}%` }}></div>
-                        <input type="range" min="80" max="500" value={580 - zoom} onChange={(e) => setZoom(580 - Number(e.target.value))} className="zoom-slider" />
+                        <input type="range" min={window.CONFIG.ZOOM_MIN} max={window.CONFIG.ZOOM_MAX} value={(window.CONFIG.ZOOM_MAX + window.CONFIG.ZOOM_MIN) - zoom} onChange={(e) => setZoom((window.CONFIG.ZOOM_MAX + window.CONFIG.ZOOM_MIN) - Number(e.target.value))} className="zoom-slider" />
                     </div>
 
                     <div className="flex gap-2 w-full md:w-auto order-2 md:order-5">

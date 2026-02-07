@@ -11,9 +11,11 @@ window.draw = {
             const state = ctx.marketStatesRef.current[ctx.activeTab];
             const activeTrades = ctx.activeTradesRef.current.filter(t => t.tabIndex === ctx.activeTab);
 
-            const SMOOTHING = 0.05;
-            state.visualValue += (state.currentValue - state.visualValue) * 0.3;
-            state.scrollOffset += (state.targetScroll - state.scrollOffset) * SMOOTHING;
+            const conf = window.CONFIG;
+
+            // Price and Scroll Smoothing
+            state.visualValue += (state.currentValue - state.visualValue) * conf.PRICE_SMOOTHING;
+            state.scrollOffset += (state.targetScroll - state.scrollOffset) * conf.SMOOTHING;
 
             context.fillStyle = '#050505';
             context.fillRect(0, 0, width, height);
@@ -37,19 +39,20 @@ window.draw = {
                 isForming: true
             });
 
-            ctx.zoomCurrentRef.current += (ctx.zoomTargetRef.current - ctx.zoomCurrentRef.current) * SMOOTHING;
+            // Zoom Smoothing
+            ctx.zoomCurrentRef.current += (ctx.zoomTargetRef.current - ctx.zoomCurrentRef.current) * conf.SMOOTHING;
             if (Math.abs(ctx.zoomTargetRef.current - ctx.zoomCurrentRef.current) < 0.05) ctx.zoomCurrentRef.current = ctx.zoomTargetRef.current;
 
             const candleWidth = (width / ctx.zoomCurrentRef.current) * (state.ticksPerCandle / 4);
 
-            let targetAnchorPercent = 0.75;
+            let targetAnchorPercent = conf.ANCHOR_DEFAULT;
             if (activeTrades.length > 0) {
                 const maxDuration = Math.max(...activeTrades.map(t => t.duration));
                 if (maxDuration >= 30000) targetAnchorPercent = 0.50;
                 else if (maxDuration >= 15000) targetAnchorPercent = 0.60;
             }
-            if (typeof state.currentAnchor === 'undefined') state.currentAnchor = 0.75;
-            state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * SMOOTHING;
+            if (typeof state.currentAnchor === 'undefined') state.currentAnchor = conf.ANCHOR_DEFAULT;
+            state.currentAnchor += (targetAnchorPercent - state.currentAnchor) * conf.SMOOTHING;
             const anchorX = width * state.currentAnchor;
 
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
@@ -63,12 +66,13 @@ window.draw = {
 
             if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
             const rawRange = maxPrice - minPrice || 10;
-            const targetPadding = rawRange * 0.45;
+            const targetPadding = rawRange * conf.Y_RANGE_PADDING;
             const targetMin = minPrice - targetPadding;
             const targetMax = maxPrice + targetPadding;
-            const VERTICAL_SMOOTHING = 0.05;
-            state.visualMinPrice += (targetMin - state.visualMinPrice) * VERTICAL_SMOOTHING;
-            state.visualMaxPrice += (targetMax - state.visualMaxPrice) * VERTICAL_SMOOTHING;
+
+            // Vertical Range Smoothing
+            state.visualMinPrice += (targetMin - state.visualMinPrice) * conf.VERTICAL_SMOOTHING;
+            state.visualMaxPrice += (targetMax - state.visualMaxPrice) * conf.VERTICAL_SMOOTHING;
             let yMin = state.visualMinPrice;
             let yMax = state.visualMaxPrice;
 
@@ -98,7 +102,7 @@ window.draw = {
 
             const previewDuration = state.tradeDuration || 10000;
             const currentCandleIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
-            const futureTicksAhead = (previewDuration / 1000 * 2); // TICK_RATE 2
+            const futureTicksAhead = (previewDuration / 1000 * conf.TICK_RATE);
 
             // Gray marker: Fixed X position on screen, uses currentY
             const grayMarkerX = anchorX + (futureTicksAhead / state.ticksPerCandle) * candleWidth;
@@ -133,21 +137,18 @@ window.draw = {
                 context.shadowBlur = 0;
             });
 
-            // FIX 3: Trade entry markers use time-based offset from current position
-            // This makes positioning robust against density changes
+            // Trade entry markers use time-based offset from current position
             activeTrades.forEach(trade => {
                 const yEntry = getY(trade.entryPrice);
 
-                // Calculate entry position based on elapsed time since trade started
-                // This approach survives density changes and candle rebuilds
                 const elapsedSeconds = (Date.now() - trade.startTime) / 1000;
-                const elapsedTicks = elapsedSeconds * 2; // TICK_RATE 2
+                const elapsedTicks = elapsedSeconds * conf.TICK_RATE;
                 const entryCandleOffset = elapsedTicks / state.ticksPerCandle;
                 const entryCandleIndex = currentCandleIndex - entryCandleOffset;
                 const xEntry = getXInstant(entryCandleIndex);
 
                 const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
-                const remainingTicks = remainingSeconds * 2; // TICK_RATE 2
+                const remainingTicks = remainingSeconds * conf.TICK_RATE;
                 const expireCandleIndex = currentCandleIndex + (remainingTicks / state.ticksPerCandle);
                 const xExpire = getXInstant(expireCandleIndex);
 

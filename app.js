@@ -103,8 +103,8 @@ const MarketSim = () => {
         if (hasActiveTrades && zoomTargetRef.current > 200) {
             preTradeZoomRef.current = zoomTargetRef.current;
             isUserInteractingRef.current = false;
-            zoomTargetRef.current = 160;
-            setZoom(160);
+            zoomTargetRef.current = window.CONFIG.ZOOM_DEFAULT;
+            setZoom(window.CONFIG.ZOOM_DEFAULT);
         } else if (!hasActiveTrades && preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
             zoomTargetRef.current = preTradeZoomRef.current;
             setZoom(preTradeZoomRef.current);
@@ -231,7 +231,7 @@ const MarketSim = () => {
             if (!navigator.onLine || !isTabVisibleRef.current) return;
             const deltaTime = now - lastLogicTimeRef.current;
 
-            const zoomPct = (500 - zoomCurrentRef.current) / 420;
+            const zoomPct = (window.CONFIG.ZOOM_MAX - zoomCurrentRef.current) / (window.CONFIG.ZOOM_MAX - window.CONFIG.ZOOM_MIN);
             let targetTicksPerCandle = 4;
             if (zoomPct > 0.75) targetTicksPerCandle = 3; else if (zoomPct < 0.25) targetTicksPerCandle = 5;
 

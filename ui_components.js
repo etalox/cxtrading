@@ -102,7 +102,7 @@ window.UI = {
                     <button
                         onClick={handleGenerateAsset}
                         disabled={isGenerating || !isOnline}
-                        className={`glass-button w-full md:w-[240px] h-16 flex items-center justify-start gap-3 pl-[48px] hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`glass-button w-full md:w-[206px] h-16 flex items-center justify-start gap-3 pl-[48px] hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <div className="w-5 h-5 flex items-center justify-center">
                             <img src={isGenerating ? window.ICONS.loader : window.ICONS.search} className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} />

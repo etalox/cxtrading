@@ -101,8 +101,8 @@ window.UI = {
                 <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                     <button
                         onClick={handleGenerateAsset}
-                        disabled={isGenerating || !isOnline}
-                        className={`glass-button w-full md:w-[206px] h-16 flex items-center justify-start gap-3 pl-[34px] hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={isGenerating || !isOnline || activeTradesUI.length > 0}
+                        className={`glass-button w-full md:w-[206px] h-16 flex items-center justify-start gap-3 pl-[34px] hover:bg-white/20 order-1 transition-all duration-200 ${isGenerating || !isOnline || activeTradesUI.length > 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                     >
                         <div className="w-5 h-5 flex items-center justify-center">
                             <img src={isGenerating ? window.ICONS.loader : window.ICONS.search} className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} />

@@ -136,7 +136,7 @@ window.UI = {
                             onTouchEnd={() => handleTouchEnd('BUY')}
                             disabled={tradesDisabled}
                             style={{ opacity: tradesDisabled ? 0.5 : buyButtonOpacity, transition: buyButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease' }}
-                            className={`flex md:w-[192px] h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#15c58b] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                            className={`flex-1 md:w-[192px] h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#15c58b] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >
                             <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
                             <div className="flex flex-col items-start gap-0 text-black">
@@ -151,7 +151,7 @@ window.UI = {
                             onTouchEnd={() => handleTouchEnd('SELL')}
                             disabled={tradesDisabled}
                             style={{ opacity: tradesDisabled ? 0.5 : sellButtonOpacity, transition: sellButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease' }}
-                            className={`flex md:w-[192px] h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#ff5573] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                            className={`flex-1 md:w-[192px] h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#ff5573] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >
                             <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
                             <div className="flex flex-col items-start gap-0 text-black">

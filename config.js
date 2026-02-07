@@ -8,7 +8,7 @@ window.CONFIG = {
     MAX_CANDLES: 999,
 
     // Rendering Smoothing
-    SMOOTHING: 0.05,
+    SMOOTHING: 0.06,
     VERTICAL_SMOOTHING: 0.05,
     PRICE_SMOOTHING: 0.3,
 

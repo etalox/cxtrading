@@ -22,6 +22,6 @@ window.CONFIG = {
 
     // Zoom Controls
     ZOOM_MIN: 80,
-    ZOOM_MAX: 500,
+    ZOOM_MAX: 640,
     ZOOM_DEFAULT: 160
 };

@@ -98,19 +98,23 @@ const MarketSim = () => {
         };
     }, []);
 
+    const autopilotStartBalanceRef = useRef(null);
+    const consecutiveLossesRef = useRef(0);
+
     useEffect(() => {
         const hasActiveTrades = activeTradesUI.length > 0;
-        if (hasActiveTrades && zoomTargetRef.current > 200) {
-            preTradeZoomRef.current = zoomTargetRef.current;
+        const state = marketStatesRef.current[activeTab];
+        if (hasActiveTrades && (state.zoomTarget || INITIAL_ZOOM) > 200) {
+            preTradeZoomRef.current = state.zoomTarget || INITIAL_ZOOM;
             isUserInteractingRef.current = false;
-            zoomTargetRef.current = window.CONFIG.ZOOM_DEFAULT;
+            state.zoomTarget = window.CONFIG.ZOOM_DEFAULT;
             setZoom(window.CONFIG.ZOOM_DEFAULT);
         } else if (!hasActiveTrades && preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
-            zoomTargetRef.current = preTradeZoomRef.current;
+            state.zoomTarget = preTradeZoomRef.current;
             setZoom(preTradeZoomRef.current);
             preTradeZoomRef.current = null;
         }
-    }, [activeTradesUI.length]);
+    }, [activeTradesUI.length, activeTab]);
 
     const activeTradesRef = useRef([]);
     const isNotificationVisible = useRef(false);
@@ -138,6 +142,12 @@ const MarketSim = () => {
         if (!isOnline) return;
         const maxTrades = autopilot ? 1 : 4;
         if (activeTradesRef.current.length >= maxTrades) return;
+
+        if (autopilot && activeTradesRef.current.length === 0) {
+            if (autopilotStartBalanceRef.current === null) {
+                autopilotStartBalanceRef.current = balance;
+            }
+        }
 
         if (type === 'BUY') { setBuyButtonOpacity(0.5); setTimeout(() => setBuyButtonOpacity(1), 120); }
         else { setSellButtonOpacity(0.5); setTimeout(() => setSellButtonOpacity(1), 120); }
@@ -190,6 +200,14 @@ const MarketSim = () => {
         state.visualMinPrice = undefined; state.visualMaxPrice = undefined;
         setCurrentDuration(state.tradeDuration / 1000);
         setCurrentPriceUI(state.visualValue);
+
+        // Sync zoom when changing tabs
+        if (!isMobileRef.current) {
+            const tabZoom = state.zoom || INITIAL_ZOOM;
+            zoomTargetRef.current = state.zoomTarget || tabZoom;
+            zoomCurrentRef.current = tabZoom;
+            setZoom(tabZoom);
+        }
     };
 
     useEffect(() => {
@@ -257,6 +275,20 @@ const MarketSim = () => {
                     expiredTrades.forEach(trade => {
                         const tradeState = marketStatesRef.current[trade.tabIndex];
                         const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
+
+                        if (autopilot) {
+                            if (isWin) {
+                                consecutiveLossesRef.current = 0;
+                            } else {
+                                consecutiveLossesRef.current += 1;
+                                // Check for 3 losses + 20% drop
+                                if (consecutiveLossesRef.current >= 3 && balance <= autopilotStartBalanceRef.current * 0.8) {
+                                    setAutopilot(false);
+                                    addNotification({ type: 'NOTIFICACIÓN', signalType: 'SYSTEM', confidence: 1, message: 'AUTOPILOT TERMINATED BY SAFETY PROTOCOL' });
+                                }
+                            }
+                        }
+
                         if (trade.aiSnapshot) window.aiEngine.trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
                         if (trade.tabIndex === activeTab) {
                             const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
@@ -271,7 +303,12 @@ const MarketSim = () => {
             }
 
             if (now - lastUIUpdateRef.current >= window.CONFIG.UI_UPDATE_RATE_MS) {
-                setCurrentPriceUI(marketStatesRef.current[activeTab].visualValue);
+                const currentState = marketStatesRef.current[activeTab];
+                if (!isMobileRef.current) {
+                    currentState.zoom = zoom;
+                    currentState.zoomTarget = zoomTargetRef.current;
+                }
+                setCurrentPriceUI(currentState.visualValue);
                 setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
                 if (activeTradesRef.current.length > 0) setActiveTradesUI([...activeTradesRef.current]);
                 lastUIUpdateRef.current = now;

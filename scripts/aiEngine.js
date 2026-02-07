@@ -58,7 +58,7 @@ window.aiEngine = {
         const inputFeatures = { vel: Math.abs(velocity) * 10, acc: Math.abs(acceleration) * 100, z: Math.abs(zScore), dur: normalizedDuration, trend: trendDirection };
 
         const rawSum = (inputFeatures.vel * brain.weights.velocity) + (inputFeatures.acc * brain.weights.acceleration) + (inputFeatures.z * brain.weights.zScore) + (inputFeatures.dur * brain.weights.duration) + brain.weights.bias;
-        const confidence = window.sigmoid(rawSum);
+        const confidence = Math.min(0.9, window.sigmoid(rawSum));
 
         ks.lastEma = currentEma; ks.lastVelocity = velocity; ks.currentFeatures = inputFeatures;
         ctx.setAiConfidence(confidence);

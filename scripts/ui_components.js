@@ -114,11 +114,14 @@ window.UI = {
                     </button>
 
                     {!isMobile && (
-                        <div className="h-16 px-6 flex items-center gap-4 order-2 md:order-4 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setAutopilot(!autopilot)}>
+                        <div
+                            className={`h-16 px-6 flex items-center gap-4 order-2 md:order-4 transition-all ${window.CONFIG.INVESTMENT_AMOUNT >= balance * 0.1 ? 'opacity-30 cursor-not-allowed grayscale' : 'cursor-pointer hover:opacity-80'}`}
+                            onClick={() => window.CONFIG.INVESTMENT_AMOUNT < balance * 0.1 && setAutopilot(!autopilot)}
+                        >
                             <div className={`toggle-switch ${autopilot ? 'active' : ''}`}><div className="toggle-knob"></div></div>
                             <div className="flex flex-col items-start gap-1">
                                 <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
-                                <div className="text-white text-sm font-normal uppercase">{autopilot ? 'WORKING...' : 'OFF'}</div>
+                                <div className="text-white text-sm font-normal uppercase">{window.CONFIG.INVESTMENT_AMOUNT >= balance * 0.1 ? 'LOCKED' : (autopilot ? 'WORKING...' : 'OFF')}</div>
                             </div>
                         </div>
                     )}

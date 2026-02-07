@@ -22,7 +22,6 @@ const MarketSim = () => {
 
     const assetHistoryRef = useRef([]);
 
-    // Logic moved to generator.js
     const marketStatesRef = useRef([window.generator.createEmptyState(), window.generator.createEmptyState(), window.generator.createEmptyState()]);
     const tickHistoriesRef = useRef([[], [], []]);
     const kinematicsRef = useRef([
@@ -35,7 +34,7 @@ const MarketSim = () => {
     const isTabVisibleRef = useRef(true);
     const isCatchingUpRef = useRef(false);
 
-    // Zoom and interaction handling
+    // Refs for interaction handling
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const pinchStartRef = useRef(null);
@@ -61,6 +60,7 @@ const MarketSim = () => {
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
     const touchedButtonsRef = useRef(new Set());
 
+    // Setup interactions using interface.js module
     useEffect(() => {
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
         updateMobile();
@@ -69,51 +69,24 @@ const MarketSim = () => {
         const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        const container = containerRef.current;
-        if (!container) return;
+        const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
+            isUserInteracting: isUserInteractingRef.current,
+            zoomTarget: zoomTargetRef,
+            pinchStart: pinchStartRef,
+            lastTouchTarget: lastTouchTargetRef,
+            isUserInteracting: isUserInteractingRef,
+            setZoom: (val) => setZoom(val)
+        });
 
-        const isInteractive = (node) => { try { return node && node.closest && node.closest('button, input, .glass-button, .tab-item, .toggle-switch'); } catch (e) { return false; } };
-        const onWheel = (e) => {
-            if (isInteractive(e.target)) return;
-            e.preventDefault();
-            isUserInteractingRef.current = true;
-            const factor = e.deltaY > 0 ? 1.06 : 0.94;
-            const newTarget = Math.max(80, Math.min(500, zoomTargetRef.current * factor));
-            zoomTargetRef.current = newTarget;
-            setZoom(newTarget);
-        };
-        let touchActive = false;
-        const onTouchStart = (e) => {
-            if (e.touches && e.touches.length === 2) { if (isInteractive(e.target)) return; touchActive = true; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; pinchStartRef.current = Math.hypot(dx, dy); lastTouchTargetRef.current = e.target; }
-        };
-        const onTouchMove = (e) => {
-            if (!touchActive) return;
-            if (e.touches && e.touches.length === 2 && pinchStartRef.current) {
-                if (isInteractive(lastTouchTargetRef.current)) return;
-                e.preventDefault();
-                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                const ratio = pinchStartRef.current / dist;
-                pinchStartRef.current = dist;
-                isUserInteractingRef.current = true;
-                const newTarget = Math.max(80, Math.min(500, Math.round(zoomTargetRef.current * ratio)));
-                zoomTargetRef.current = newTarget;
-                setZoom(newTarget);
-            }
-        };
-        const onTouchEnd = () => { if (!window.event?.touches || window.event?.touches?.length < 2) { touchActive = false; pinchStartRef.current = null; lastTouchTargetRef.current = null; } };
-
-        container.addEventListener('wheel', onWheel, { passive: false });
-        container.addEventListener('touchstart', onTouchStart, { passive: false });
-        container.addEventListener('touchmove', onTouchMove, { passive: false });
-        container.addEventListener('touchend', onTouchEnd);
+        const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
+            isMobile: isMobileRef
+        });
 
         return () => {
             window.removeEventListener('resize', updateMobile);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            container.removeEventListener('wheel', onWheel);
-            container.removeEventListener('touchstart', onTouchStart);
-            container.removeEventListener('touchmove', onTouchMove);
-            container.removeEventListener('touchend', onTouchEnd);
+            if (cleanupInteractions) cleanupInteractions();
+            if (cleanupResize) cleanupResize();
         };
     }, []);
 
@@ -300,24 +273,6 @@ const MarketSim = () => {
         loop();
         return () => cancelAnimationFrame(animationId);
     }, [zoom, addNotification, activeTab, autopilot]);
-
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        const resizeObserver = new ResizeObserver(entries => {
-            const entry = entries[0];
-            if (!entry || entry.contentRect.width === 0) return;
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const dpr = window.devicePixelRatio || 1;
-                canvas.width = entry.contentRect.width * dpr; canvas.height = entry.contentRect.height * dpr;
-                canvas.style.width = `${entry.contentRect.width}px`; canvas.style.height = `${entry.contentRect.height}px`;
-                isMobileRef.current = entry.contentRect.width < 768;
-            }
-        });
-        resizeObserver.observe(container);
-        return () => resizeObserver.disconnect();
-    }, []);
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 

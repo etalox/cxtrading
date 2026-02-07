@@ -318,7 +318,7 @@ const MarketSim = () => {
         lastLogicTimeRef.current = Date.now();
         loop();
         return () => cancelAnimationFrame(animationId);
-    }, [zoom, addNotification, activeTab, autopilot]);
+    }, [zoom, addNotification, activeTab, autopilot, balance]);
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
@@ -362,7 +362,7 @@ const MarketSim = () => {
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
                 activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
                 currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
-                executeTrade={executeTrade} tradesDisabled={tradesDisabled}
+                executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
             />
         </div>
     );

@@ -87,7 +87,7 @@ window.UI = {
         isGenerating, isOnline, isMobile, handleGenerateAsset,
         autopilot, setAutopilot, sliderPercentage, zoom, setZoom,
         activeTradesUI, buyButtonOpacity, sellButtonOpacity, currentDuration,
-        handleTouchStart, handleTouchEnd, executeTrade, tradesDisabled
+        handleTouchStart, handleTouchEnd, executeTrade, tradesDisabled, balance
     }) => {
         const buyTrades = activeTradesUI.filter(t => t.type === 'BUY');
         const sellTrades = activeTradesUI.filter(t => t.type === 'SELL');

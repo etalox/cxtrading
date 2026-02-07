@@ -87,17 +87,12 @@ window.draw = {
             const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
             const currentY = getY(state.visualValue);
 
-            // FIX 2: Smooth the Y position for all price line elements
-            if (typeof state.visualCurrentY === 'undefined') state.visualCurrentY = currentY;
-            state.visualCurrentY += (currentY - state.visualCurrentY) * 0.15;
-            const smoothY = state.visualCurrentY;
-
-            // Dashed horizontal price line
+            // Horizontal price line
             context.strokeStyle = '#222';
             context.setLineDash([4, 4]);
             context.beginPath();
-            context.moveTo(0, smoothY);
-            context.lineTo(width, smoothY);
+            context.moveTo(0, currentY);
+            context.lineTo(width, currentY);
             context.stroke();
             context.setLineDash([]);
 
@@ -105,18 +100,18 @@ window.draw = {
             const currentCandleIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
             const futureTicksAhead = (previewDuration / 1000 * 2); // TICK_RATE 2
 
-            // Gray marker: Fixed X position on screen, uses smoothY
+            // Gray marker: Fixed X position on screen, uses currentY
             const grayMarkerX = anchorX + (futureTicksAhead / state.ticksPerCandle) * candleWidth;
             context.strokeStyle = activeTrades.length > 0 ? '#333' : '#666';
             context.lineWidth = 1;
             context.setLineDash([2, 4]);
             context.beginPath();
-            context.moveTo(anchorX, smoothY);
-            context.lineTo(grayMarkerX, smoothY);
+            context.moveTo(anchorX, currentY);
+            context.lineTo(grayMarkerX, currentY);
             context.stroke();
             context.beginPath();
-            context.moveTo(grayMarkerX, smoothY - 20);
-            context.lineTo(grayMarkerX, smoothY + 20);
+            context.moveTo(grayMarkerX, currentY - 20);
+            context.lineTo(grayMarkerX, currentY + 20);
             context.stroke();
             context.setLineDash([]);
 
@@ -217,11 +212,11 @@ window.draw = {
             });
             context.globalAlpha = 1;
 
-            // Gray price label: Fixed X at edge of screen, smooth Y
+            // Gray price label: Fixed X at edge of screen
             const isSmallScreen = width < 768;
             const labelX = isSmallScreen ? 0 : width - 100;
             const textX = isSmallScreen ? 50 : width - 50;
-            const labelY = smoothY;
+            const labelY = currentY;
             context.fillStyle = '#111';
             context.fillRect(labelX, labelY - 10, 100, 20);
             context.fillStyle = '#fff';

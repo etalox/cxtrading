@@ -52,7 +52,7 @@ window.UI = {
     ),
 
     NotificationList: ({ notifications, onNotificationClick }) => (
-        <div className="absolute top-[100px] md:top-[140px] w-full flex flex-col items-center gap-4 z-30 pointer-events-none px-4">
+        <div className="absolute top-[100px] md:top-[140px] w-full flex items-center justify-center gap-4 z-30 pointer-events-none px-4">
             {notifications.map(note => {
                 let iconSrc = window.ICONS.activityNeutral;
                 let iconStyle = {};
@@ -67,7 +67,7 @@ window.UI = {
                         className={`glass-panel !bg-white/0 !rounded-[20px] px-6 h-16 flex items-center justify-center gap-4 animate-fade-in text-white/100 ${note.type === 'SIGNAL' ? 'pointer-events-auto cursor-pointer hover:bg-white/15 transition-all' : ''}`}
                     >
                         <div className="w-12 h-12 animate-blink border border-white/40 rounded-[15px] flex items-center justify-center shrink-0">
-                            <img src={iconSrc} className="w-5 h-5" style={{ filter: 'brightness(0) invert(1)' }} />
+                            <img src={iconSrc} className="w-5 h-5" style={{ ...iconStyle, filter: note.type === 'SIGNAL' ? iconStyle.filter : 'brightness(0) invert(1)' }} />
                         </div>
                         <div className="flex flex-col animate-blink justify-center items-start gap-1">
                             <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
@@ -118,7 +118,7 @@ window.UI = {
                             <div className={`toggle-switch ${autopilot ? 'active' : ''}`}><div className="toggle-knob"></div></div>
                             <div className="flex flex-col items-start gap-1">
                                 <div className="opacity-60 text-white text-[10px] font-normal uppercase">AUTOPILOT</div>
-                                <div className="text-white text-sm font-normal uppercase">{autopilot ? 'ON' : 'OFF'}</div>
+                                <div className="text-white text-sm font-normal uppercase">{autopilot ? 'WORKING...' : 'OFF'}</div>
                             </div>
                         </div>
                     )}
@@ -135,11 +135,14 @@ window.UI = {
                             onTouchStart={() => handleTouchStart('BUY')}
                             onTouchEnd={() => handleTouchEnd('BUY')}
                             disabled={tradesDisabled}
-                            style={{ opacity: tradesDisabled ? 0.5 : buyButtonOpacity, transition: buyButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease' }}
-                            className={`flex-1 md:w-[192px] h-16 bg-[#10B981] rounded-[20px] shadow-[0_0_20px_rgba(16,185,129,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#15c58b] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                            style={{
+                                opacity: buyRemaining > 0 ? 1 : (autopilot ? 0.5 : (tradesDisabled ? 0.5 : buyButtonOpacity)),
+                                transition: buyButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease'
+                            }}
+                            className={`flex-1 md:w-[192px] h-16 ${autopilot ? 'bg-white' : 'bg-[#10B981]'} rounded-[20px] ${buyRemaining > 0 && autopilot ? 'animate-glow-active' : (autopilot ? '' : 'shadow-[0_0_20px_rgba(16,185,129,0.2)]')} flex items-center justify-start pl-[28px] gap-3 active:scale-95 ${autopilot ? 'hover:bg-white/90' : 'hover:bg-[#15c58b]'} select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >
-                            <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
-                            <div className="flex flex-col items-start gap-0 text-black">
+                            <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: autopilot ? 'none' : 'brightness(0)' }} />
+                            <div className={`flex flex-col items-start gap-0 ${autopilot ? 'text-black' : 'text-black'}`}>
                                 <div className="opacity-60 text-[10px] font-normal">{buyRemaining > 0 ? 'ABIERTO' : 'OPERAR COMPRA'}</div>
                                 <div className="text-sm font-medium">{buyRemaining > 0 ? `BUYING... ${buyRemaining.toFixed(1)}s` : `BUY / ${currentDuration}s.`}</div>
                             </div>
@@ -150,11 +153,14 @@ window.UI = {
                             onTouchStart={() => handleTouchStart('SELL')}
                             onTouchEnd={() => handleTouchEnd('SELL')}
                             disabled={tradesDisabled}
-                            style={{ opacity: tradesDisabled ? 0.5 : sellButtonOpacity, transition: sellButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease' }}
-                            className={`flex-1 md:w-[192px] h-16 bg-[#F43F5E] rounded-[20px] shadow-[0_0_20px_rgba(244,63,94,0.2)] flex items-center justify-start pl-[28px] gap-3 active:scale-95 hover:bg-[#ff5573] select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
+                            style={{
+                                opacity: sellRemaining > 0 ? 1 : (autopilot ? 0.5 : (tradesDisabled ? 0.5 : sellButtonOpacity)),
+                                transition: sellButtonOpacity === 0.5 ? 'opacity 120ms ease, transform 0.1s ease' : 'opacity 400ms ease, transform 0.1s ease'
+                            }}
+                            className={`flex-1 md:w-[192px] h-16 ${autopilot ? 'bg-white' : 'bg-[#F43F5E]'} rounded-[20px] ${sellRemaining > 0 && autopilot ? 'animate-glow-active' : (autopilot ? '' : 'shadow-[0_0_20px_rgba(244,63,94,0.2)]')} flex items-center justify-start pl-[28px] gap-3 active:scale-95 ${autopilot ? 'hover:bg-white/90' : 'hover:bg-[#ff5573]'} select-none ${tradesDisabled ? 'cursor-not-allowed' : ''}`}
                         >
-                            <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
-                            <div className="flex flex-col items-start gap-0 text-black">
+                            <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: autopilot ? 'none' : 'brightness(0)', transform: 'scaleY(-1)' }} />
+                            <div className={`flex flex-col items-start gap-0 ${autopilot ? 'text-black' : 'text-black'}`}>
                                 <div className="opacity-60 text-[10px] font-normal">{sellRemaining > 0 ? 'ABIERTO' : 'OPERAR VENTA'}</div>
                                 <div className="text-sm font-medium">{sellRemaining > 0 ? `SELLING... ${sellRemaining.toFixed(1)}s` : `SELL / ${currentDuration}s.`}</div>
                             </div>

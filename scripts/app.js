@@ -120,6 +120,7 @@ const MarketSim = () => {
     const resultLabelsRef = useRef([]);
 
     const addNotification = useCallback((data) => {
+        if (data.type === 'SIGNAL' && data.confidence <= 0) return;
         if (data.type === 'SIGNAL' && isNotificationVisible.current) return;
         if (data.type === 'WIN' || data.type === 'LOSS') return;
         const id = Date.now() + Math.random();

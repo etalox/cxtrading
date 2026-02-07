@@ -71,10 +71,10 @@ window.UI = {
                         </div>
                         <div className="flex flex-col animate-blink justify-center items-start gap-1">
                             <div className="opacity-80 text-white/50 text-[10px] font-normal capitalize">
-                                {note.type === 'SIGNAL' ? `${note.signalType} SIGNAL` : 'NOTIFICACIÓN'}
+                                {note.type === 'SIGNAL' ? 'SIGNAL' : 'NOTIFICACIÓN'}
                             </div>
                             <div className="text-sm font-medium">
-                                {note.type === 'SIGNAL' ? `CONF: ${(note.confidence * 100).toFixed(0)}%` : 'SISTEMA'}
+                                {note.type === 'SIGNAL' ? `${note.signalType}: ${(note.confidence * 100).toFixed(0)}%` : 'SISTEMA'}
                             </div>
                         </div>
                     </div>

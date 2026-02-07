@@ -102,7 +102,7 @@ window.UI = {
                     <button
                         onClick={handleGenerateAsset}
                         disabled={isGenerating || !isOnline}
-                        className={`glass-button w-full md:w-[206px] h-16 flex items-center justify-start gap-3 pl-[48px] hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`glass-button w-full md:w-[206px] h-16 flex items-center justify-start gap-3 pl-[34px] hover:bg-white/20 order-1 transition-opacity duration-200 ${isGenerating || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <div className="w-5 h-5 flex items-center justify-center">
                             <img src={isGenerating ? window.ICONS.loader : window.ICONS.search} className={`w-5 h-5 ${isGenerating ? 'animate-spin' : ''}`} />
@@ -140,8 +140,8 @@ window.UI = {
                         >
                             <img src={window.ICONS.trendingUp} className="w-5 h-5" style={{ filter: 'brightness(0)' }} />
                             <div className="flex flex-col items-start gap-0 text-black">
-                                <div className="opacity-60 text-[10px] font-normal">{buyRemaining > 0 ? 'OPERACIÓN ABIERTA' : 'OPERAR COMPRA'}</div>
-                                <div className="text-sm font-medium">{buyRemaining > 0 ? `COMPRANDO... ${buyRemaining.toFixed(1)}s` : `BUY / ${currentDuration}s.`}</div>
+                                <div className="opacity-60 text-[10px] font-normal">{buyRemaining > 0 ? 'ABIERTO' : 'OPERAR COMPRA'}</div>
+                                <div className="text-sm font-medium">{buyRemaining > 0 ? `BUYING... ${buyRemaining.toFixed(1)}s` : `BUY / ${currentDuration}s.`}</div>
                             </div>
                         </button>
 
@@ -155,8 +155,8 @@ window.UI = {
                         >
                             <img src={window.ICONS.trendingDown} className="w-5 h-5" style={{ filter: 'brightness(0)', transform: 'scaleY(-1)' }} />
                             <div className="flex flex-col items-start gap-0 text-black">
-                                <div className="opacity-60 text-[10px] font-normal">{sellRemaining > 0 ? 'OPERACIÓN ABIERTA' : 'OPERAR VENTA'}</div>
-                                <div className="text-sm font-medium">{sellRemaining > 0 ? `VENDIENDO... ${sellRemaining.toFixed(1)}s` : `SELL / ${currentDuration}s.`}</div>
+                                <div className="opacity-60 text-[10px] font-normal">{sellRemaining > 0 ? 'ABIERTO' : 'OPERAR VENTA'}</div>
+                                <div className="text-sm font-medium">{sellRemaining > 0 ? `SELLING... ${sellRemaining.toFixed(1)}s` : `SELL / ${currentDuration}s.`}</div>
                             </div>
                         </button>
                     </div>

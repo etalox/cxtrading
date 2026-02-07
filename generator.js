@@ -143,10 +143,9 @@ window.generator = {
     },
 
     generateAssetForTab: (tabIndex, ctx) => {
-        const startTime = Date.now();
+        const startTime = performance.now();
         ctx.setIsGenerating(true);
 
-        // Yield to allow UI update before heavy CPU task
         setTimeout(() => {
             const now = Date.now();
             ctx.assetHistoryRef.current = ctx.assetHistoryRef.current.filter(a => now - a.timestamp < 300000);
@@ -171,7 +170,6 @@ window.generator = {
             };
 
             if (!findAvailableAsset()) {
-                // If failed, retry LATER but keep isGenerating true
                 setTimeout(() => window.generator.generateAssetForTab(tabIndex, ctx), 500);
                 return;
             }
@@ -180,9 +178,10 @@ window.generator = {
             const newBasePrice = 1000 + (1 - rand) * 99000;
             const dna = window.generator.generateDNAFromName(matIdx, adjIdx);
             let preferredDurations;
-            if (dna.volatility > 1.2 || dna.aggression > 0.6) { preferredDurations = [5000, 5000, 10000]; }
-            else if (dna.structure > 0.7) { preferredDurations = [15000, 30000, 30000]; }
-            else { preferredDurations = [5000, 10000, 15000, 30000]; }
+            if (dna.volatility > 1.2 || dna.aggression > 0.6) preferredDurations = [5000, 5000, 10000];
+            else if (dna.structure > 0.7) preferredDurations = [15000, 30000, 30000];
+            else preferredDurations = [5000, 10000, 15000, 30000];
+
             const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
             ctx.tickHistoriesRef.current[tabIndex] = [];
             ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
@@ -190,14 +189,22 @@ window.generator = {
 
             const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15;
             window.generator.warmUpMarket(tabIndex, ctx, randomWarmupMinutes);
-            ctx.setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
-            if (tabIndex === ctx.activeTab) { ctx.setCurrentDuration(randomDuration / 1000); }
 
-            // Ensure minimum 400ms of "Searching" state for the requested feel
-            const elapsed = Date.now() - startTime;
+            // Sync reveal with minimum 400ms duration
+            const elapsed = performance.now() - startTime;
             const wait = Math.max(0, 400 - elapsed);
-            setTimeout(() => ctx.setIsGenerating(false), wait);
-        }, 40);
+
+            setTimeout(() => {
+                ctx.setAssetsInfo(prev => {
+                    const next = [...prev];
+                    next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 };
+                    return next;
+                });
+                if (tabIndex === ctx.activeTab) ctx.setCurrentDuration(randomDuration / 1000);
+                // Final state reset ALWAYS after minimum 400ms or actual work time
+                ctx.setIsGenerating(false);
+            }, wait);
+        }, 30);
     },
 
     rebuildCandles: (tabIndex, ctx) => {

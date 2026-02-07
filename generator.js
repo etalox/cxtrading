@@ -193,11 +193,11 @@ window.generator = {
             ctx.setAssetsInfo(prev => { const next = [...prev]; next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 }; return next; });
             if (tabIndex === ctx.activeTab) { ctx.setCurrentDuration(randomDuration / 1000); }
 
-            // Ensure minimum 600ms of "Searching" state for premium feel
+            // Ensure minimum 400ms of "Searching" state for the requested feel
             const elapsed = Date.now() - startTime;
-            const wait = Math.max(0, 600 - elapsed);
+            const wait = Math.max(0, 400 - elapsed);
             setTimeout(() => ctx.setIsGenerating(false), wait);
-        }, 50);
+        }, 40);
     },
 
     rebuildCandles: (tabIndex, ctx) => {

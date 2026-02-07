@@ -8,7 +8,7 @@ window.CONFIG = {
     MAX_CANDLES: 999,
 
     // Rendering Smoothing
-    SMOOTHING: 0.06,
+    SMOOTHING: 0.05,
     VERTICAL_SMOOTHING: 0.05,
     PRICE_SMOOTHING: 0.3,
 
@@ -18,6 +18,6 @@ window.CONFIG = {
 
     // Zoom Controls
     ZOOM_MIN: 80,
-    ZOOM_MAX: 500,
+    ZOOM_MAX: 640,
     ZOOM_DEFAULT: 160
 };

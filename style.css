@@ -85,7 +85,7 @@ body {
     width: 24px;
     height: 18px;
     background: #ffffff;
-    border-radius: 50%;
+    border-radius: 9px;
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }

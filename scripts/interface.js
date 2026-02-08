@@ -27,26 +27,34 @@ window.Interface = {
         if (!container) return;
 
         const onWheel = (e) => {
-            if (window.Interface.isInteractive(e.target)) return;
-            e.preventDefault();
-            refs.isUserInteracting.current = true;
-            const factor = e.deltaY > 0 ? 1.06 : 0.94;
-            const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
-            refs.zoomTarget.current = newTarget;
-            refs.setZoom(newTarget);
+        if (window.Interface.isInteractive(e.target)) return;
+        e.preventDefault();
+        refs.isUserInteracting.current = true; // Asegurar interacción
+        
+        const factor = e.deltaY > 0 ? 1.06 : 0.94;
+        const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
+        refs.zoomTarget.current = newTarget;
+        refs.setZoom(newTarget);
 
-            // Enforce boundary after zoom
-            const state = refs.marketStatesRef.current[refs.activeTab.current];
-            const dpr = window.devicePixelRatio || 1;
-            const width = container.clientWidth;
-            const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
-            const isSmall = width < 768;
-            const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
-            const anchorX = width * anchorDefault;
-            const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
-            const minScroll = (anchorX + shift) / candleWidth;
-            if (state.targetScroll < minScroll) state.targetScroll = minScroll;
-        };
+        // Enforce boundary after zoom
+        const state = refs.marketStatesRef.current[refs.activeTab.current];
+        const dpr = window.devicePixelRatio || 1;
+        const width = container.clientWidth;
+        const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+        const isSmall = width < 768;
+        const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
+        const anchorX = width * anchorDefault;
+        const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+        const minScroll = (anchorX + shift) / candleWidth;
+
+        // [CORRECCIÓN] Asegurar que targetScroll respete AMBOS límites (minScroll y candles.length)
+        // Esto evita que el zoom empuje el scroll hacia el vacío o rompa la referencia visual
+        if (state.targetScroll < minScroll) {
+            state.targetScroll = minScroll;
+        } else if (state.targetScroll > state.candles.length) {
+            state.targetScroll = state.candles.length;
+        }
+    };
 
         let touchActive = false;
         const onTouchStart = (e) => {

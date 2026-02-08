@@ -1,57 +1,18 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 const MarketSim = () => {
-    const isMobile = window.innerWidth < 768;
-    const INITIAL_ZOOM = isMobile ? 160 : 320;
-    const isMobileRef = useRef(isMobile);
-
-    const [activeTab, setActiveTab] = useState(0);
-    const [assetsInfo, setAssetsInfo] = useState([
-        { name: "INIT 01", price: 1000, change: 0 },
-        { name: "INIT 02", price: 1000, change: 0 },
-        { name: "INIT 03", price: 1000, change: 0 }
-    ]);
-
-    const activeTabRef = useRef(activeTab);
-    useEffect(() => {
-    activeTabRef.current = activeTab;
-    }, [activeTab]);
-
-    const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
-    isUserInteracting: isUserInteractingRef, // Corregido: pasar ref, no valor
-    zoomTarget: zoomTargetRef,
-    pinchStart: pinchStartRef,
-    lastTouchTarget: lastTouchTargetRef,
-    setZoom: (val) => setZoom(val),
-    // [NUEVO] Agregar estos dos parámetros que faltaban:
-    marketStatesRef: marketStatesRef,
-    activeTab: activeTabRef 
-  });
-
-    const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
-        isMobile: isMobileRef
-    });
-
-    const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
-        marketStatesRef,
-        activeTab: activeTabRef, // [CAMBIO] Pasar activeTabRef en lugar de activeTab
-        zoomCurrentRef,
-        isUserInteracting: isUserInteractingRef
-    });
-
-    // ... return cleanup ...
-    }, []); 
-
-    const [balance, setBalance] = useState(() => {
-        try {
-            const saved = localStorage.getItem('cx_balance');
-            return saved ? parseFloat(saved) : 100000;
-        } catch (e) { return 100000; }
-    });
-    useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
-
-    const assetHistoryRef = useRef([]);
-
+    // 1. CONSTANTES Y ESTADO INICIAL
+    const isMobileInitial = window.innerWidth < 768;
+    const INITIAL_ZOOM = isMobileInitial ? 160 : 320;
+    
+    // 2. DEFINICIÓN DE REFS (Primero, para que estén disponibles)
+    const containerRef = useRef(null);
+    const canvasRef = useRef(null);
+    const isMobileRef = useRef(isMobileInitial);
+    const activeTabRef = useRef(0);
+    const isUserInteractingRef = useRef(false);
+    
+    // Refs de Lógica de Mercado
     const marketStatesRef = useRef([window.generator.createEmptyState(), window.generator.createEmptyState(), window.generator.createEmptyState()]);
     const tickHistoriesRef = useRef([[], [], []]);
     const kinematicsRef = useRef([
@@ -59,23 +20,45 @@ const MarketSim = () => {
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
     ]);
-
+    const assetHistoryRef = useRef([]);
     const lastLogicTimeRef = useRef(Date.now());
     const isTabVisibleRef = useRef(true);
     const isCatchingUpRef = useRef(false);
 
-    // Refs for interaction handling
-    const containerRef = useRef(null);
-    const canvasRef = useRef(null);
+    // Refs de Interacción
     const pinchStartRef = useRef(null);
     const lastTouchTargetRef = useRef(null);
-    const isUserInteractingRef = useRef(false);
-
-    const [zoom, setZoom] = useState(INITIAL_ZOOM);
     const zoomTargetRef = useRef(INITIAL_ZOOM);
     const zoomCurrentRef = useRef(INITIAL_ZOOM);
     const preTradeZoomRef = useRef(null);
+    const touchedButtonsRef = useRef(new Set());
+    
+    // Refs de Trading/AI
+    const autopilotStartBalanceRef = useRef(null);
+    const consecutiveLossesRef = useRef(0);
+    const activeTradesRef = useRef([]);
+    const isNotificationVisible = useRef(false);
+    const lastSignalRef = useRef(null);
+    const lastUIUpdateRef = useRef(0);
+    const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
+    const resultLabelsRef = useRef([]);
 
+    // 3. ESTADOS DE REACT
+    const [activeTab, setActiveTab] = useState(0);
+    const [assetsInfo, setAssetsInfo] = useState([
+        { name: "INIT 01", price: 1000, change: 0 },
+        { name: "INIT 02", price: 1000, change: 0 },
+        { name: "INIT 03", price: 1000, change: 0 }
+    ]);
+
+    const [balance, setBalance] = useState(() => {
+        try {
+            const saved = localStorage.getItem('cx_balance');
+            return saved ? parseFloat(saved) : 100000;
+        } catch (e) { return 100000; }
+    });
+
+    const [zoom, setZoom] = useState(INITIAL_ZOOM);
     const [activeTradesUI, setActiveTradesUI] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [currentPriceUI, setCurrentPriceUI] = useState(15868.30);
@@ -85,13 +68,21 @@ const MarketSim = () => {
     const [aiConfidence, setAiConfidence] = useState(0);
     const [aiLearnedCount, setAiLearnedCount] = useState(0);
     const [autopilot, setAutopilot] = useState(false);
-
     const [buyButtonOpacity, setBuyButtonOpacity] = useState(1);
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
-    const touchedButtonsRef = useRef(new Set());
 
-    // Setup interactions using interface.js module
+    // 4. EFFECTS DE SINCRONIZACIÓN BÁSICA
     useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
+
+    useEffect(() => { 
+        localStorage.setItem('cx_balance', balance); 
+    }, [balance]);
+
+    // 5. SETUP DE INTERFAZ (Corrección Principal: Unificado y Ordenado)
+    useEffect(() => {
+        // A. Listeners de Ventana
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
         updateMobile();
         window.addEventListener('resize', updateMobile);
@@ -99,22 +90,27 @@ const MarketSim = () => {
         const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
+        // B. Setup Zoom y Touch (Incluye tus correcciones [NUEVO])
         const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
-            isUserInteracting: isUserInteractingRef.current,
+            isUserInteracting: isUserInteractingRef, // Corregido: pasar ref
             zoomTarget: zoomTargetRef,
             pinchStart: pinchStartRef,
             lastTouchTarget: lastTouchTargetRef,
-            isUserInteracting: isUserInteractingRef,
-            setZoom: (val) => setZoom(val)
+            setZoom: (val) => setZoom(val),
+            // Nuevos parámetros agregados:
+            marketStatesRef: marketStatesRef,
+            activeTab: activeTabRef 
         });
 
+        // C. Setup Resize
         const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
             isMobile: isMobileRef
         });
 
+        // D. Setup Drag (Incluye tus correcciones [CAMBIO])
         const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
             marketStatesRef,
-            activeTab,
+            activeTab: activeTabRef, // Corregido: pasar ref
             zoomCurrentRef,
             isUserInteracting: isUserInteractingRef
         });
@@ -126,11 +122,9 @@ const MarketSim = () => {
             if (cleanupResize) cleanupResize();
             if (cleanupDrag) cleanupDrag();
         };
-    }, []);
+    }, []); // Array vacío: Solo se ejecuta al montar
 
-    const autopilotStartBalanceRef = useRef(null);
-    const consecutiveLossesRef = useRef(0);
-
+    // 6. LÓGICA DE NEGOCIO Y NOTIFICACIONES
     useEffect(() => {
         const hasActiveTrades = activeTradesUI.length > 0;
         const state = marketStatesRef.current[activeTab];
@@ -145,13 +139,6 @@ const MarketSim = () => {
             preTradeZoomRef.current = null;
         }
     }, [activeTradesUI.length, activeTab]);
-
-    const activeTradesRef = useRef([]);
-    const isNotificationVisible = useRef(false);
-    const lastSignalRef = useRef(null);
-    const lastUIUpdateRef = useRef(0);
-    const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
-    const resultLabelsRef = useRef([]);
 
     const addNotification = useCallback((data) => {
         if (data.type === 'SIGNAL' && data.confidence <= 0) return;
@@ -217,6 +204,7 @@ const MarketSim = () => {
         zoomCurrentRef, zoomTargetRef
     });
 
+    // 7. INICIALIZACIÓN DE GENERADORES Y EVENTOS DE RED
     useEffect(() => {
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
@@ -231,7 +219,6 @@ const MarketSim = () => {
         setCurrentDuration(state.tradeDuration / 1000);
         setCurrentPriceUI(state.visualValue);
 
-        // Sync zoom when changing tabs
         if (!isMobileRef.current) {
             const tabZoom = state.zoom || INITIAL_ZOOM;
             zoomTargetRef.current = state.zoomTarget || tabZoom;
@@ -248,6 +235,7 @@ const MarketSim = () => {
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
     }, [addNotification]);
 
+    // 8. GAME LOOP (RequestAnimationFrame)
     useEffect(() => {
         let animationId;
         const runMarketLogic = (forceSnap) => {
@@ -311,7 +299,6 @@ const MarketSim = () => {
                                 consecutiveLossesRef.current = 0;
                             } else {
                                 consecutiveLossesRef.current += 1;
-                                // Check for 3 losses + 20% drop
                                 if (consecutiveLossesRef.current >= 3 && balance <= autopilotStartBalanceRef.current * 0.8) {
                                     setAutopilot(false);
                                     addNotification({ type: 'NOTIFICACIÓN', signalType: 'SYSTEM', confidence: 1, message: 'AUTOPILOT TERMINATED BY SAFETY PROTOCOL' });
@@ -352,6 +339,7 @@ const MarketSim = () => {
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
+    // 9. RENDER JSX
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
             <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
@@ -368,7 +356,7 @@ const MarketSim = () => {
                         <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
                         <div className="flex flex-col justify-center items-start gap-1">
                             <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
-                            <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                            <div className="text-sm font-medium">SIN CONEXIÓN Wi-Fi</div>
                         </div>
                     </div>
                 </div>
@@ -385,7 +373,7 @@ const MarketSim = () => {
             </div>
 
             <window.UI.BottomControls
-                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
+                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobileRef.current}
                 handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}

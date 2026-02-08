@@ -199,12 +199,13 @@ window.generator = {
             const randomWarmupMinutes = Math.floor(Math.random() * 6) + 10;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
-            // Sync reveal: Hold until minimum 400ms since start of click
+            // Staggered reveal: Chart at 200ms, End loading at 400ms
             const elapsed = performance.now() - startTime;
-            const wait = Math.max(0, 400 - elapsed);
+            const dataWait = Math.max(0, 200 - elapsed);
+            const animWait = Math.max(0, 400 - elapsed);
 
+            // Step 1: Atomic Data Swap (Reveal Chart)
             setTimeout(() => {
-                // ATOMIC SWAP: Displace old data and end search animation simultaneously
                 ctx.tickHistoriesRef.current[tabIndex] = [];
                 ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
                 ctx.marketStatesRef.current[tabIndex] = newState;
@@ -217,12 +218,14 @@ window.generator = {
 
                 if (tabIndex === ctx.activeTab) {
                     ctx.setCurrentDuration(randomDuration / 1000);
-                    // Ensure the state update is reflected in the chart immediately
                     if (ctx.setCurrentPriceUI) ctx.setCurrentPriceUI(newBasePrice);
                 }
+            }, dataWait);
 
+            // Step 2: End Search Animation
+            setTimeout(() => {
                 ctx.setIsGenerating(false);
-            }, wait);
+            }, animWait);
         }, 30);
     },
 

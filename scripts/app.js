@@ -43,10 +43,10 @@ const MarketSim = () => {
     const lastSignalRef = useRef(null);
     const lastUIUpdateRef = useRef(0);
     const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
-    
     const resultLabelsRef = useRef([]);
-    // Refs para lógica de penalización de búsqueda
-    const searchHistoryRef = useRef([]); // [{ timestamp, isRapid }]
+
+    // Refs para penalización de búsqueda
+    const searchHistoryRef = useRef([]); // timestamps (ms)
     const searchPenaltyRef = useRef(0);
 
     // 3. ESTADOS DE REACT
@@ -362,42 +362,37 @@ const MarketSim = () => {
     }, [zoom, addNotification, activeTab, autopilot, balance]);
 
     
-    const handleGenerateClick = () => {
+    const handleGenerateAsset = () => {
+        // No permitir doble click ni reentradas
         if (isGenerating) return;
+        if (!isOnline) return;
+        if (activeTradesRef.current.length > 0) return;
 
         const now = Date.now();
-        const history = searchHistoryRef.current;
 
-        // 1. Calcular si es búsqueda rápida (< 1000ms desde la anterior)
-        const lastTimestamp = history.length > 0 ? history[history.length - 1].timestamp : 0;
-        const diff = now - lastTimestamp;
-        const isRapid = diff < 1000;
+        // Contar cuántas búsquedas han ocurrido en los últimos 10s
+        searchHistoryRef.current = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 10000);
+        const countLast10s = searchHistoryRef.current.length;
 
-        // 2. Actualizar historial (Máx 10)
-        history.push({ timestamp: now, isRapid });
-        if (history.length > 10) history.shift();
-
-        // 3. Contar rápidas en las últimas 10
-        const rapidCount = history.filter(h => h.isRapid).length;
-
-        // 4. Lógica de Penalización
-        // "Si de las últimas 10... al menos 5 fueron rápidas"
-        if (rapidCount >= 5) {
-            searchPenaltyRef.current += 200; // Acumulativo
+        // Si el usuario buscó más de 10 veces durante los últimos 10 segundos,
+        // agregar penalización acumulativa (200ms por búsqueda)
+        if (countLast10s > 10) {
+            searchPenaltyRef.current += 200;
         } else {
-            searchPenaltyRef.current = 0; // Reset si el comportamiento mejora
+            // Si baja del umbral, se elimina la penalización acumulada
+            searchPenaltyRef.current = 0;
         }
 
-        // 5. Ejecutar
-        setIsGenerating(true); // Bloquear UI inmediatamente
+        // Bloquear UI inmediatamente (la animación de loader empieza ya)
+        setIsGenerating(true);
 
-        // Aplicar el delay calculado antes de llamar al generador
+        // Esperar la penalización y luego generar
         setTimeout(() => {
             window.generator.generateAssetForTab(activeTab, getContext());
         }, searchPenaltyRef.current);
     };
 
-    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
+const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
@@ -433,7 +428,7 @@ const MarketSim = () => {
 
             <window.UI.BottomControls
                 isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobileRef.current}
-                handleGenerateAsset={handleGenerateClick}
+                handleGenerateAsset={handleGenerateAsset}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}

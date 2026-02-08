@@ -72,10 +72,11 @@ const MarketSim = () => {
             tickHistories: tickHistoriesRef.current,
             activeTab,
             currentDuration,
-            autopilot
+            autopilot,
+            isGenerating
         };
         sessionStorage.setItem('cx_session_state', JSON.stringify(stateToSave));
-    }, [balance, assetsInfo, activeTab, currentDuration, autopilot]);
+    }, [balance, assetsInfo, activeTab, currentDuration, autopilot, isGenerating]);
 
     const loadFromSession = () => {
         try {
@@ -89,6 +90,7 @@ const MarketSim = () => {
             setActiveTab(data.activeTab);
             setCurrentDuration(data.currentDuration);
             setAutopilot(data.autopilot);
+            setIsGenerating(data.isGenerating || false);
             return true;
         } catch (e) { return false; }
     };
@@ -107,12 +109,21 @@ const MarketSim = () => {
             }, 400);
         } else {
             setIsInitialLoading(false);
+            // Safety check: if restored state is not initialized, start generation
+            const ctx = getContext();
+            [0, 1, 2].forEach(idx => {
+                const state = marketStatesRef.current[idx];
+                if (!state || !state.initialized) {
+                    setIsGenerating(true);
+                    window.generator.generateAssetForTab(idx, ctx);
+                }
+            });
         }
     }, []);
 
     useEffect(() => {
         if (!isInitialLoading) saveToSession();
-    }, [balance, assetsInfo, activeTab, currentDuration, autopilot, isInitialLoading, saveToSession]);
+    }, [balance, assetsInfo, activeTab, currentDuration, autopilot, isInitialLoading, isGenerating, saveToSession]);
 
     // Setup interactions using interface.js module
     useEffect(() => {

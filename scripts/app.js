@@ -86,7 +86,6 @@ const MarketSim = () => {
     useEffect(() => {
         if (!window.Interface) return;
 
-        // A. Listeners de Ventana
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
         updateMobile();
         window.addEventListener('resize', updateMobile);
@@ -94,7 +93,6 @@ const MarketSim = () => {
         const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // B. Setup Zoom y Touch
         const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
             isUserInteracting: isUserInteractingRef, 
             zoomTarget: zoomTargetRef,
@@ -102,16 +100,13 @@ const MarketSim = () => {
             lastTouchTarget: lastTouchTargetRef,
             setZoom: (val) => setZoom(val),
             marketStatesRef: marketStatesRef,
-            activeTab: activeTabRef,
-            zoomCurrentRef: zoomCurrentRef // Pasamos zoomCurrent para cálculos precisos
+            activeTab: activeTabRef
         });
 
-        // C. Setup Resize
         const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
             isMobile: isMobileRef
         });
 
-        // D. Setup Drag
         const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
             marketStatesRef,
             activeTab: activeTabRef,
@@ -128,7 +123,7 @@ const MarketSim = () => {
         };
     }, []); 
 
-    // 6. LÓGICA DE NEGOCIO
+    // 6. LÓGICA DE NEGOCIO Y NOTIFICACIONES
     useEffect(() => {
         const hasActiveTrades = activeTradesUI.length > 0;
         const state = marketStatesRef.current[activeTab];
@@ -223,6 +218,9 @@ const MarketSim = () => {
         setCurrentDuration(state.tradeDuration / 1000);
         setCurrentPriceUI(state.visualValue);
 
+        // Reset interaction flag on tab change so it snaps to live
+        isUserInteractingRef.current = false;
+
         if (!isMobileRef.current) {
             const tabZoom = state.zoom || INITIAL_ZOOM;
             zoomTargetRef.current = state.zoomTarget || tabZoom;
@@ -288,16 +286,12 @@ const MarketSim = () => {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
                 
-                // [LÓGICA AUTO-SCROLL MEJORADA]
-                // Solo auto-scrollear si NO hay interacción del usuario
+                // [LÓGICA DE AUTO-SCROLL]
+                // Solo si el usuario NO está interactuando, forzamos el scroll al final
                 if (safeTicks > 1 && !isUserInteractingRef.current) {
                     [0, 1, 2].forEach(idx => { 
-                        const s = marketStatesRef.current[idx];
-                        // Solo snap si ya estábamos muy cerca del final
-                        if (s.targetScroll >= s.candles.length - 1.5) {
-                            s.targetScroll = s.candles.length; 
-                            s.scrollOffset = s.candles.length; 
-                        }
+                        marketStatesRef.current[idx].targetScroll = marketStatesRef.current[idx].candles.length; 
+                        marketStatesRef.current[idx].scrollOffset = marketStatesRef.current[idx].candles.length; 
                     });
                 }
                 
@@ -310,11 +304,9 @@ const MarketSim = () => {
                     expiredTrades.forEach(trade => {
                         const tradeState = marketStatesRef.current[trade.tabIndex];
                         const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
-
                         if (autopilot) {
-                            if (isWin) {
-                                consecutiveLossesRef.current = 0;
-                            } else {
+                            if (isWin) { consecutiveLossesRef.current = 0; }
+                            else {
                                 consecutiveLossesRef.current += 1;
                                 if (consecutiveLossesRef.current >= 3 && balance <= autopilotStartBalanceRef.current * 0.8) {
                                     setAutopilot(false);
@@ -322,7 +314,6 @@ const MarketSim = () => {
                                 }
                             }
                         }
-
                         if (trade.aiSnapshot) window.aiEngine.trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
                         if (trade.tabIndex === activeTab) {
                             const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);

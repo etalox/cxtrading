@@ -97,7 +97,7 @@ window.UI = {
         const sellRemaining = mostRecentSell ? Math.max(0, (mostRecentSell.expiryTime - Date.now()) / 1000) : 0;
 
         return (
-            <div className={`absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto animate-slide-up`}>
+            <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto">
                 <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                     <button
                         onClick={handleGenerateAsset}

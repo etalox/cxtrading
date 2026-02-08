@@ -9,16 +9,6 @@ window.draw = {
             context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             const state = ctx.marketStatesRef.current[ctx.activeTab];
-            if (!ctx.isAppReady) {
-                context.fillStyle = '#050505';
-                context.fillRect(0, 0, width, height);
-                return;
-            }
-            if (!state || !state.initialized) {
-                context.fillStyle = '#050505';
-                context.fillRect(0, 0, width, height);
-                return;
-            }
             const activeTrades = ctx.activeTradesRef.current.filter(t => t.tabIndex === ctx.activeTab);
 
             const conf = window.CONFIG;
@@ -77,7 +67,7 @@ window.draw = {
             allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
             if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
 
-            if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
+            if (typeof state.visualMinPrice === 'undefined' || isNaN(state.visualMinPrice)) { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
             const rawRange = maxPrice - minPrice || 10;
             const targetPadding = rawRange * yPadding;
             const targetMin = minPrice - targetPadding;
@@ -86,8 +76,15 @@ window.draw = {
             // Vertical Range Smoothing
             state.visualMinPrice += (targetMin - state.visualMinPrice) * conf.VERTICAL_SMOOTHING;
             state.visualMaxPrice += (targetMax - state.visualMaxPrice) * conf.VERTICAL_SMOOTHING;
+
+            // Final Sanity Check
+            if (isNaN(state.visualMinPrice) || !isFinite(state.visualMinPrice)) state.visualMinPrice = targetMin || 900;
+            if (isNaN(state.visualMaxPrice) || !isFinite(state.visualMaxPrice)) state.visualMaxPrice = targetMax || 1100;
+
             let yMin = state.visualMinPrice;
             let yMax = state.visualMaxPrice;
+
+            if (yMax === yMin) { yMin -= 5; yMax += 5; }
 
             const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
             const safeZoneBottom = Math.min(height - 250, height * 0.65);

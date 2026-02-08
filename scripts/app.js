@@ -307,57 +307,71 @@ const MarketSim = () => {
                 setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
                 lastUIUpdateRef.current = now;
             }
-            window.draw.drawCanvas({ ...getContext(), activeTab: activeTabRef.current });
+
+            // USE FRESH CONTEXT AND REFS IN DRAW
+            window.draw.drawCanvas({
+                canvasRef,
+                marketStatesRef,
+                activeTab: activeTabRef.current,
+                activeTradesRef,
+                zoomCurrentRef,
+                zoomTargetRef,
+                resultLabelsRef
+            });
         };
         loop();
         return () => cancelAnimationFrame(animationId);
-    }, [balance, addNotification]); // STABLE LOOP
+    }, [isOnline, balance]); // Trigger on connectivity or balance changes
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4) || isInitialLoading || isGenerating;
 
     return (
-        <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden animate-blur-reveal" style={{ height: '100dvh' }}>
+        <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden animate-blur-reveal" style={{ height: '100dvh', width: '100vw' }}>
             {isInitialLoading && (
-                <div className="fixed inset-0 bg-black flex items-center justify-center z-[100]">
-                    <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40" />
+                <div className="fixed inset-0 bg-[#050505] flex items-center justify-center z-[100]">
+                    <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40 shrink-0" />
                 </div>
             )}
-            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
+
+            <div className="fixed inset-0 z-0 bg-[#050505]" ref={containerRef}>
                 <canvas ref={canvasRef} className="w-full h-full cursor-crosshair block" />
             </div>
-            <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
-            <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none animate-slide-down-tabs">
-                <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
-            </div>
-            {!isOnline && (
-                <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
-                    <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                        <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                        <div className="flex flex-col justify-center items-start gap-1">
-                            <div className="opacity-80 text-white/50 text-[10px] font-normal uppercase">EN ESPERA DE RED...</div>
-                            <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+
+            <div className="relative z-10 flex flex-col h-full pointer-events-none">
+                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
+                <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none animate-slide-down-tabs">
+                    <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
+                </div>
+                {!isOnline && (
+                    <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
+                        <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
+                            <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                            <div className="flex flex-col justify-center items-start gap-1">
+                                <div className="opacity-80 text-white/50 text-[10px] font-normal uppercase">EN ESPERA DE RED...</div>
+                                <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                            </div>
                         </div>
                     </div>
+                )}
+                <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
+                <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
+                    <div className="text-[10px] font-bold text-[#444] tracking-widest uppercase">ADAPTIVE CRITIC</div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
+                        <span className="text-[9px] text-[#555] lowercase">{aiLearnedCount} ops</span>
+                    </div>
                 </div>
-            )}
-            <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
-            <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
-                <div className="text-[10px] font-bold text-[#444] tracking-widest uppercase">ADAPTIVE CRITIC</div>
-                <div className="flex items-center gap-2">
-                    <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
-                    <span className="text-[9px] text-[#555] lowercase">{aiLearnedCount} ops</span>
-                </div>
+                <window.UI.BottomControls
+                    isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
+                    handleGenerateAsset={handleGenerateAsset}
+                    autopilot={autopilot} setAutopilot={setAutopilot}
+                    sliderPercentage={((zoom - window.CONFIG.ZOOM_MIN) / (window.CONFIG.ZOOM_MAX - window.CONFIG.ZOOM_MIN)) * 100}
+                    zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
+                    activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
+                    currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
+                    executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
+                />
             </div>
-            <window.UI.BottomControls
-                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
-                handleGenerateAsset={handleGenerateAsset}
-                autopilot={autopilot} setAutopilot={setAutopilot}
-                sliderPercentage={((zoom - window.CONFIG.ZOOM_MIN) / (window.CONFIG.ZOOM_MAX - window.CONFIG.ZOOM_MIN)) * 100}
-                zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
-                activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
-                currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
-                executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
-            />
         </div>
     );
 };

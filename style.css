@@ -23,8 +23,15 @@
     font-family: 'BDO Grotesk', sans-serif !important;
 }
 
+html,
 body {
+    height: 100%;
+    width: 100%;
     margin: 0;
+    padding: 0;
+}
+
+body {
     background-color: #050505;
     color: white;
     overflow: hidden;

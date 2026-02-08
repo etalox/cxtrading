@@ -1,5 +1,5 @@
 const { useState, useEffect, useRef, useCallback } = React;
-const SESSION_VERSION = "20260207.18";
+const SESSION_VERSION = "20260207.19";
 
 const MarketSim = () => {
     const isMobile = window.innerWidth < 768;
@@ -54,15 +54,22 @@ const MarketSim = () => {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                if (data.version === SESSION_VERSION && data.assetsInfo) {
+                if (data.version === SESSION_VERSION && data.assetsInfo && data.marketStates) {
                     setAssetsInfo(data.assetsInfo);
                     setActiveTab(data.activeTab || 0);
                     marketStatesRef.current = data.marketStates;
                     tickHistoriesRef.current = data.tickHistories;
                     kinematicsRef.current = data.kinematics;
                     assetHistoryRef.current = data.assetHistory || [];
+                    setIsAppReady(true);
+                    setIsIntroActive(false);
+                } else {
+                    sessionStorage.removeItem('cx_session_state');
                 }
-            } catch (e) { console.error("Session restore failed", e); }
+            } catch (e) {
+                console.error("Session restore failed", e);
+                sessionStorage.removeItem('cx_session_state');
+            }
         }
     }, []);
 
@@ -236,17 +243,15 @@ const MarketSim = () => {
         marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
         addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
         setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef
+        zoomCurrentRef, zoomTargetRef, isAppReady
     });
 
     useEffect(() => {
-        // FAIL-SAFE: Force isAppReady after 5 seconds to prevent black screen hang
-        const failSafe = setTimeout(() => {
-            if (!isAppReady) {
-                console.warn("Forcing App Ready (Fail-safe)");
-                setIsAppReady(true);
-            }
-        }, 5000);
+        // BULLETPROOF FAIL-SAFE: Force reveal after 3 seconds max
+        const revealTimer = setTimeout(() => {
+            setIsAppReady(true);
+            setIsIntroActive(false);
+        }, 3000);
 
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
@@ -257,15 +262,15 @@ const MarketSim = () => {
                         if (marketStatesRef.current[0].initialized) {
                             setIsAppReady(true);
                             clearInterval(checkInit);
-                            clearTimeout(failSafe);
                         }
                     }, 100);
                 }
             }, delay));
         } else {
-            clearTimeout(failSafe);
+            setIsAppReady(true);
+            setIsIntroActive(false);
         }
-        return () => clearTimeout(failSafe);
+        return () => clearTimeout(revealTimer);
     }, []);
 
     const handleTabChange = (index) => {

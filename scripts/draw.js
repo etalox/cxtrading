@@ -9,7 +9,7 @@ window.draw = {
             context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             const state = ctx.marketStatesRef.current[ctx.activeTab];
-            if (!ctx.isAppReady && !state.initialized) {
+            if (!ctx.isAppReady) {
                 context.fillStyle = '#050505';
                 context.fillRect(0, 0, width, height);
                 return;

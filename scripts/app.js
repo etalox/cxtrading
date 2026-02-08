@@ -291,8 +291,7 @@ const MarketSim = () => {
                 if (safeTicks > 1 && !isUserInteractingRef.current) {
                     [0, 1, 2].forEach(idx => { 
                         const s = marketStatesRef.current[idx];
-                        // Margen de tolerancia: 1.5 velas. Si estamos más atrás, NO forzar seguimiento.
-                        if (s.targetScroll >= s.candles.length - 4) {
+                        if (s.targetScroll >= s.candles.length - 8) {
                             s.targetScroll = s.candles.length; 
                             s.scrollOffset = s.candles.length; 
                         }

@@ -180,8 +180,8 @@ const MarketSim = () => {
         handleGenerateAsset();
 
         const checkDone = setInterval(() => {
-            if (marketStatesRef.current.every(s => s.initialized)) {
-                setTimeout(() => setIsInitialLoading(false), 200);
+            if (marketStatesRef.current.every(s => s.initialized) && canvasRef.current) {
+                setTimeout(() => setIsInitialLoading(false), 300);
                 clearInterval(checkDone);
             }
         }, 100);
@@ -321,19 +321,20 @@ const MarketSim = () => {
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4) || isInitialLoading || isGenerating;
 
-    if (isInitialLoading) {
-        return (
-            <div className="fixed inset-0 bg-black flex items-center justify-center z-[100]">
-                <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40" />
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden animate-blur-reveal" style={{ height: '100dvh' }}>
-            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
+            {isInitialLoading && (
+                <div className="fixed inset-0 bg-black flex items-center justify-center z-[100]">
+                    <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40" />
+                </div>
+            )}
+
+            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
+                <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
+            </div>
+
             <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
-            <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none animate-slide-down">
+            <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none animate-slide-down-tabs">
                 <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
             </div>
             {!isOnline && (

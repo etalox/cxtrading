@@ -36,7 +36,7 @@ window.Interface = {
             refs.setZoom(newTarget);
 
             // Enforce boundary after zoom
-            const state = refs.marketStatesRef.current[refs.activeTab];
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
             const dpr = window.devicePixelRatio || 1;
             const width = container.clientWidth;
             const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
@@ -74,7 +74,7 @@ window.Interface = {
                 refs.setZoom(newTarget);
 
                 // Enforce boundary after zoom
-                const state = refs.marketStatesRef.current[refs.activeTab];
+                const state = refs.marketStatesRef.current[refs.activeTab.current];
                 const dpr = window.devicePixelRatio || 1;
                 const width = container.clientWidth;
                 const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
@@ -119,7 +119,7 @@ window.Interface = {
             if (window.Interface.isInteractive(target)) return;
             isDragging = true;
             startX = clientX;
-            const state = refs.marketStatesRef.current[refs.activeTab];
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
             startTargetScroll = state.targetScroll;
             refs.isUserInteracting.current = true;
         };
@@ -127,7 +127,7 @@ window.Interface = {
         const handleMove = (clientX) => {
             if (!isDragging) return;
             const deltaX = clientX - startX;
-            const state = refs.marketStatesRef.current[refs.activeTab];
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
 
             // Calculate candle width (consistent with draw.js)
             const dpr = window.devicePixelRatio || 1;

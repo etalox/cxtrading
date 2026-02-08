@@ -12,6 +12,31 @@ const MarketSim = () => {
         { name: "INIT 03", price: 1000, change: 0 }
     ]);
 
+    const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
+    isUserInteracting: isUserInteractingRef, // Corregido: pasar ref, no valor
+    zoomTarget: zoomTargetRef,
+    pinchStart: pinchStartRef,
+    lastTouchTarget: lastTouchTargetRef,
+    setZoom: (val) => setZoom(val),
+    // [NUEVO] Agregar estos dos parámetros que faltaban:
+    marketStatesRef: marketStatesRef,
+    activeTab: activeTabRef 
+  });
+
+    const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
+        isMobile: isMobileRef
+    });
+
+    const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
+        marketStatesRef,
+        activeTab: activeTabRef, // [CAMBIO] Pasar activeTabRef en lugar de activeTab
+        zoomCurrentRef,
+        isUserInteracting: isUserInteractingRef
+    });
+
+    // ... return cleanup ...
+    }, []); 
+
     const [balance, setBalance] = useState(() => {
         try {
             const saved = localStorage.getItem('cx_balance');

@@ -51,6 +51,12 @@ const MarketSim = () => {
         { name: "INIT 03", price: 1000, change: 0 }
     ]);
 
+    // Definiendo el ref para activeTab
+    const activeTabRef = useRef(activeTab);
+    useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
+
     const [balance, setBalance] = useState(() => {
         try {
             const saved = localStorage.getItem('cx_balance');

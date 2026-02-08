@@ -5,11 +5,14 @@ const MarketSim = () => {
     const isMobileInitial = window.innerWidth < 768;
     const INITIAL_ZOOM = isMobileInitial ? 160 : 320;
     
-    // 2. DEFINICIÓN DE REFS (Primero, para que estén disponibles)
+    // 2. DEFINICIÓN DE REFS
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const isMobileRef = useRef(isMobileInitial);
-    const activeTabRef = useRef(0);
+    
+    // [REF UNIFICADO] Definido una sola vez aquí
+    const activeTabRef = useRef(0); 
+    
     const isUserInteractingRef = useRef(false);
     
     // Refs de Lógica de Mercado
@@ -51,12 +54,6 @@ const MarketSim = () => {
         { name: "INIT 03", price: 1000, change: 0 }
     ]);
 
-    // Definiendo el ref para activeTab
-    const activeTabRef = useRef(activeTab);
-    useEffect(() => {
-        activeTabRef.current = activeTab;
-    }, [activeTab]);
-
     const [balance, setBalance] = useState(() => {
         try {
             const saved = localStorage.getItem('cx_balance');
@@ -78,6 +75,8 @@ const MarketSim = () => {
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
 
     // 4. EFFECTS DE SINCRONIZACIÓN BÁSICA
+    
+    // Sincronizar activeTab con su ref
     useEffect(() => {
         activeTabRef.current = activeTab;
     }, [activeTab]);
@@ -86,7 +85,7 @@ const MarketSim = () => {
         localStorage.setItem('cx_balance', balance); 
     }, [balance]);
 
-    // 5. SETUP DE INTERFAZ (Corrección Principal: Unificado y Ordenado)
+    // 5. SETUP DE INTERFAZ
     useEffect(() => {
         // A. Listeners de Ventana
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
@@ -96,16 +95,15 @@ const MarketSim = () => {
         const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // B. Setup Zoom y Touch (Incluye tus correcciones [NUEVO])
+        // B. Setup Zoom y Touch
         const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
-            isUserInteracting: isUserInteractingRef, // Corregido: pasar ref
+            isUserInteracting: isUserInteractingRef, 
             zoomTarget: zoomTargetRef,
             pinchStart: pinchStartRef,
             lastTouchTarget: lastTouchTargetRef,
             setZoom: (val) => setZoom(val),
-            // Nuevos parámetros agregados:
             marketStatesRef: marketStatesRef,
-            activeTab: activeTabRef 
+            activeTab: activeTabRef // Pasando el Ref correctamente
         });
 
         // C. Setup Resize
@@ -113,10 +111,10 @@ const MarketSim = () => {
             isMobile: isMobileRef
         });
 
-        // D. Setup Drag (Incluye tus correcciones [CAMBIO])
+        // D. Setup Drag
         const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
             marketStatesRef,
-            activeTab: activeTabRef, // Corregido: pasar ref
+            activeTab: activeTabRef, // Pasando el Ref correctamente
             zoomCurrentRef,
             isUserInteracting: isUserInteractingRef
         });
@@ -128,7 +126,7 @@ const MarketSim = () => {
             if (cleanupResize) cleanupResize();
             if (cleanupDrag) cleanupDrag();
         };
-    }, []); // Array vacío: Solo se ejecuta al montar
+    }, []); 
 
     // 6. LÓGICA DE NEGOCIO Y NOTIFICACIONES
     useEffect(() => {
@@ -210,7 +208,7 @@ const MarketSim = () => {
         zoomCurrentRef, zoomTargetRef
     });
 
-    // 7. INICIALIZACIÓN DE GENERADORES Y EVENTOS DE RED
+    // 7. INICIALIZACIÓN DE GENERADORES
     useEffect(() => {
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
@@ -241,7 +239,7 @@ const MarketSim = () => {
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
     }, [addNotification]);
 
-    // 8. GAME LOOP (RequestAnimationFrame)
+    // 8. GAME LOOP
     useEffect(() => {
         let animationId;
         const runMarketLogic = (forceSnap) => {
@@ -345,7 +343,6 @@ const MarketSim = () => {
 
     const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
-    // 9. RENDER JSX
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
             <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>

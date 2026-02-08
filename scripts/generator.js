@@ -121,9 +121,13 @@ window.generator = {
                 low: Math.min(...state.visualTicks, lastCandleClose),
                 color: close >= lastCandleClose ? '#10b981' : '#f43f5e'
             };
-            const isAtEnd = state.targetScroll >= state.candles.length - 1.1;
             state.candles.push(newCandle);
-            if (isAtEnd) state.targetScroll = state.candles.length;
+            // Auto-scroll logic: Only if the user hasn't scrolled away
+            const isAtEnd = state.targetScroll >= state.candles.length - 0.1;
+
+            if (!ctx.isUserInteracting.current || isAtEnd) {
+                state.targetScroll = state.candles.length;
+            }
             state.visualTicks = [];
 
             if (state.candles.length > window.CONFIG.MAX_CANDLES) {

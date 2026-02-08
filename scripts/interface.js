@@ -116,11 +116,23 @@ window.Interface = {
             // Update targetScroll (dragging left moves chart right, so index decreases)
             const newTarget = startTargetScroll - candleDelta;
 
-            // Limit scroll: Left extreme (0) to Right extreme (candles.length)
-            state.targetScroll = Math.max(0, Math.min(state.candles.length, newTarget));
+            // Dynamic clamping: allow current price (index candles.length) to reach x = 0
+            // getX(i) = anchorX - (scroll - i) * candleWidth + shift
+            // To reach x = 0 for i = state.candles.length: 
+            // scroll = state.candles.length + (anchorX + shift) / candleWidth
+
+            const isSmall = width < 768;
+            const anchorPercent = refs.isMobile.current ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
+            const anchorX = width * (state.currentAnchor || anchorPercent);
+            const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+
+            const maxScroll = state.candles.length + (anchorX + shift) / candleWidth;
+            const minScroll = 0 - (width - (anchorX + shift)) / candleWidth;
+
+            state.targetScroll = Math.max(minScroll, Math.min(maxScroll, newTarget));
 
             // If the user drags away from the end, we consider them interacting
-            if (state.targetScroll < state.candles.length - 0.1) {
+            if (state.targetScroll < maxScroll - 0.5) {
                 refs.isUserInteracting.current = true;
             } else {
                 // If they drag back to the very end, we can resume auto-scroll later

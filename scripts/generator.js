@@ -196,7 +196,7 @@ window.generator = {
                 initialized: false
             };
 
-            const randomWarmupMinutes = Math.floor(Math.random() * 6) + 10;
+            const randomWarmupMinutes = Math.floor(Math.random() * 30) + 15;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
             // Staggered reveal: Chart at 200ms, End loading at 400ms

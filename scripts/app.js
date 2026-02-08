@@ -371,12 +371,12 @@ const MarketSim = () => {
         const now = Date.now();
 
         // Contar cuántas búsquedas han ocurrido en los últimos 10s
-        searchHistoryRef.current = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 10000);
-        const countLast10s = searchHistoryRef.current.length;
+        searchHistoryRef.current = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 20000);
+        const countLastXs = searchHistoryRef.current.length;
 
         // Si el usuario buscó más de 10 veces durante los últimos 10 segundos,
         // agregar penalización acumulativa (200ms por búsqueda)
-        if (countLast10s > 10) {
+        if (countLastXs > 10) {
             searchPenaltyRef.current += 200;
         } else {
             // Si baja del umbral, se elimina la penalización acumulada

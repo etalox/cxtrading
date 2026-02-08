@@ -229,8 +229,16 @@ window.generator = {
         }, 30);
     },
 
-    rebuildCandles: (tabIndex, ctx) => {
+        rebuildCandles: (tabIndex, ctx) => {
         const state = ctx.marketStatesRef.current[tabIndex];
+        
+        // 1. Guardar la posición relativa actual antes de destruir las velas
+        const oldLength = state.candles.length || 1;
+        // Qué tan lejos del final estábamos (en velas)
+        const distFromEnd = oldLength - state.targetScroll;
+        // O si prefieres mantener el centro exacto:
+        // const scrollRatio = state.targetScroll / oldLength; 
+
         const allTicks = state.allTicks;
         state.candles = [];
         state.visualTicks = [];
@@ -253,7 +261,36 @@ window.generator = {
             }
         }
         state.visualTicks = tempTicks;
-        state.targetScroll = state.candles.length;
-        state.scrollOffset = state.candles.length;
+        
+        // 2. Restaurar la posición traduciendo la distancia
+        // La nueva distancia debe ser proporcional al cambio de densidad
+        // Si antes cada vela era 4 ticks y ahora es 8, hay la mitad de velas, 
+        // así que la "distancia en velas" debe ser la mitad.
+        
+        // Factor de conversión: (VelasViejas / VelasNuevas) no es exacto porque cambia ticksPerCandle.
+        // Mejor: Calcular la nueva posición restando la distancia ajustada desde el nuevo final.
+        
+        // Dado que targetScroll suele ser "índice de vela", si estábamos 10 velas atrás,
+        // y ahora las velas son el doble de "gordas", deberíamos estar 5 velas atrás.
+        // Pero como no sabemos el ratio exacto viejo/nuevo aquí fácil:
+        
+        // TRUCO SIMPLE: Mantenernos "pegados" al final si estábamos cerca, 
+        // o mantener la proporción si estábamos lejos.
+        
+        if (distFromEnd < 2) {
+             // Si estaba al final, mantener al final
+             state.targetScroll = state.candles.length;
+             state.scrollOffset = state.candles.length;
+        } else {
+             // Recalcular basado en proporción de ticks
+             // (distFromEnd * oldTicksPerCandle) / newTicksPerCandle ? 
+             // Como no tenemos oldTicksPerCandle fácil, usamos regla de tres de lengths:
+             const newLength = state.candles.length;
+             const ratio = newLength / oldLength;
+             const newDist = distFromEnd * ratio;
+             
+             state.targetScroll = newLength - newDist;
+             state.scrollOffset = newLength - newDist;
+        }
     }
 };

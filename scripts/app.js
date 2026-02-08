@@ -10,7 +10,7 @@ const MarketSim = () => {
     const canvasRef = useRef(null);
     const isMobileRef = useRef(isMobileInitial);
     
-    // [REF UNIFICADO] Definido una sola vez aquí
+    // [REF UNIFICADO]
     const activeTabRef = useRef(0); 
     
     const isUserInteractingRef = useRef(false);
@@ -26,7 +26,6 @@ const MarketSim = () => {
     const assetHistoryRef = useRef([]);
     const lastLogicTimeRef = useRef(Date.now());
     const isTabVisibleRef = useRef(true);
-    const isCatchingUpRef = useRef(false);
 
     // Refs de Interacción
     const pinchStartRef = useRef(null);
@@ -75,8 +74,6 @@ const MarketSim = () => {
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
 
     // 4. EFFECTS DE SINCRONIZACIÓN BÁSICA
-    
-    // Sincronizar activeTab con su ref
     useEffect(() => {
         activeTabRef.current = activeTab;
     }, [activeTab]);
@@ -87,6 +84,8 @@ const MarketSim = () => {
 
     // 5. SETUP DE INTERFAZ
     useEffect(() => {
+        if (!window.Interface) return;
+
         // A. Listeners de Ventana
         const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
         updateMobile();
@@ -103,7 +102,8 @@ const MarketSim = () => {
             lastTouchTarget: lastTouchTargetRef,
             setZoom: (val) => setZoom(val),
             marketStatesRef: marketStatesRef,
-            activeTab: activeTabRef // Pasando el Ref correctamente
+            activeTab: activeTabRef,
+            zoomCurrentRef: zoomCurrentRef // Pasamos zoomCurrent para cálculos precisos
         });
 
         // C. Setup Resize
@@ -114,7 +114,7 @@ const MarketSim = () => {
         // D. Setup Drag
         const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
             marketStatesRef,
-            activeTab: activeTabRef, // Pasando el Ref correctamente
+            activeTab: activeTabRef,
             zoomCurrentRef,
             isUserInteracting: isUserInteractingRef
         });
@@ -128,7 +128,7 @@ const MarketSim = () => {
         };
     }, []); 
 
-    // 6. LÓGICA DE NEGOCIO Y NOTIFICACIONES
+    // 6. LÓGICA DE NEGOCIO
     useEffect(() => {
         const hasActiveTrades = activeTradesUI.length > 0;
         const state = marketStatesRef.current[activeTab];
@@ -208,7 +208,7 @@ const MarketSim = () => {
         zoomCurrentRef, zoomTargetRef
     });
 
-    // 7. INICIALIZACIÓN DE GENERADORES
+    // 7. INICIALIZACIÓN
     useEffect(() => {
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
@@ -287,7 +287,20 @@ const MarketSim = () => {
             if (deltaTime >= window.CONFIG.LOGIC_RATE_MS) {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
-                if (safeTicks > 1 && !isUserInteractingRef.current) [0, 1, 2].forEach(idx => { marketStatesRef.current[idx].targetScroll = marketStatesRef.current[idx].candles.length; marketStatesRef.current[idx].scrollOffset = marketStatesRef.current[idx].candles.length; });
+                
+                // [LÓGICA AUTO-SCROLL MEJORADA]
+                // Solo auto-scrollear si NO hay interacción del usuario
+                if (safeTicks > 1 && !isUserInteractingRef.current) {
+                    [0, 1, 2].forEach(idx => { 
+                        const s = marketStatesRef.current[idx];
+                        // Solo snap si ya estábamos muy cerca del final
+                        if (s.targetScroll >= s.candles.length - 1.5) {
+                            s.targetScroll = s.candles.length; 
+                            s.scrollOffset = s.candles.length; 
+                        }
+                    });
+                }
+                
                 lastLogicTimeRef.current += safeTicks * window.CONFIG.LOGIC_RATE_MS;
 
                 const realNow = Date.now();

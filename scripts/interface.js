@@ -31,28 +31,56 @@ window.Interface = {
             e.preventDefault();
             refs.isUserInteracting.current = true;
             
-            const factor = e.deltaY > 0 ? 1.06 : 0.94;
-            const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
-            refs.zoomTarget.current = newTarget;
-            refs.setZoom(newTarget);
-
-            // [CORRECCIÓN CRÍTICA] Usar .current y validar ambos límites
+            // 1. Datos iniciales antes del zoom
             const state = refs.marketStatesRef.current[refs.activeTab.current];
-            const dpr = window.devicePixelRatio || 1;
+            const currentZoom = refs.zoomCurrentRef.current; // Usar el zoom REAL actual
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            
+            // Calcular ancho de vela actual
             const width = container.clientWidth;
-            const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+            const currentCandleWidth = (width / currentZoom) * (state.ticksPerCandle / 4);
+            
+            // Calcular qué vela está bajo el mouse (Pivot Point)
+            // Lógica inversa a draw.js: X -> Index
+            // x = (candleIndex - scrollOffset) * candleWidth + anchorX + shift
+            // index = ((x - anchorX - shift) / candleWidth) + scrollOffset
             
             const isSmall = width < 768;
             const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
             const anchorX = width * anchorDefault;
-            const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
-            const minScroll = (anchorX + shift) / candleWidth;
+            const shift = ((state.ticksPerCandle - 1) / 2) * (currentCandleWidth / state.ticksPerCandle);
+            
+            // El índice de la vela bajo el mouse
+            const mouseCandleIndex = ((mouseX - anchorX - shift) / currentCandleWidth) + state.targetScroll;
 
-            // Limitar scroll para evitar saltos al hacer zoom
-            if (state.targetScroll < minScroll) {
+            // 2. Aplicar Zoom
+            const factor = e.deltaY > 0 ? 1.06 : 0.94;
+            const newZoom = Math.max(80, Math.min(500, currentZoom * factor));
+            
+            refs.zoomTarget.current = newZoom;
+            refs.setZoom(newZoom);
+
+            // 3. Recalcular Scroll para mantener el Pivot (mouseCandleIndex) en el mismo mouseX
+            // Nuevo ancho de vela
+            const newCandleWidth = (width / newZoom) * (state.ticksPerCandle / 4);
+            const newShift = ((state.ticksPerCandle - 1) / 2) * (newCandleWidth / state.ticksPerCandle);
+            
+            // Despejamos targetScroll de la fórmula original usando los nuevos valores:
+            // mouseCandleIndex = ((mouseX - anchorX - newShift) / newCandleWidth) + newTargetScroll
+            // newTargetScroll = mouseCandleIndex - ((mouseX - anchorX - newShift) / newCandleWidth)
+            
+            const newTargetScroll = mouseCandleIndex - ((mouseX - anchorX - newShift) / newCandleWidth);
+            
+            // 4. Aplicar límites
+            const minScroll = (anchorX + newShift) / newCandleWidth; // Scroll mínimo (izquierda)
+            
+            if (newTargetScroll < minScroll) {
                 state.targetScroll = minScroll;
-            } else if (state.targetScroll > state.candles.length) {
+            } else if (newTargetScroll > state.candles.length) {
                 state.targetScroll = state.candles.length;
+            } else {
+                state.targetScroll = newTargetScroll;
             }
         };
 
@@ -73,16 +101,20 @@ window.Interface = {
             if (e.touches && e.touches.length === 2 && refs.pinchStart.current) {
                 if (window.Interface.isInteractive(refs.lastTouchTarget.current)) return;
                 e.preventDefault();
+                refs.isUserInteracting.current = true; // Importante
+                
                 const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 const ratio = refs.pinchStart.current / dist;
-                refs.pinchStart.current = dist;
-                refs.isUserInteracting.current = true;
                 
+                // Lógica simplificada para touch (zoom al centro o pivot medio)
+                // Por ahora mantenemos la lógica simple de zoom + clamp
                 const newTarget = Math.max(80, Math.min(500, Math.round(refs.zoomTarget.current * ratio)));
+                
+                refs.pinchStart.current = dist;
                 refs.zoomTarget.current = newTarget;
                 refs.setZoom(newTarget);
 
-                // [CORRECCIÓN] Usar .current
+                // Limitar scroll
                 const state = refs.marketStatesRef.current[refs.activeTab.current];
                 const width = container.clientWidth;
                 const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
@@ -94,6 +126,7 @@ window.Interface = {
                 const minScroll = (anchorX + shift) / candleWidth;
                 
                 if (state.targetScroll < minScroll) state.targetScroll = minScroll;
+                 else if (state.targetScroll > state.candles.length) state.targetScroll = state.candles.length;
             }
         };
 
@@ -129,7 +162,6 @@ window.Interface = {
             if (window.Interface.isInteractive(target)) return;
             isDragging = true;
             startX = clientX;
-            // [CORRECCIÓN] Usar .current
             const state = refs.marketStatesRef.current[refs.activeTab.current];
             startTargetScroll = state.targetScroll;
             refs.isUserInteracting.current = true;
@@ -138,7 +170,6 @@ window.Interface = {
         const handleMove = (clientX) => {
             if (!isDragging) return;
             const deltaX = clientX - startX;
-            // [CORRECCIÓN] Usar .current
             const state = refs.marketStatesRef.current[refs.activeTab.current];
 
             const dpr = window.devicePixelRatio || 1;
@@ -154,11 +185,11 @@ window.Interface = {
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
             const minScroll = (anchorX + shift) / candleWidth;
 
+            // Clamp estricto
             state.targetScroll = Math.max(minScroll, Math.min(state.candles.length, newTarget));
 
-            if (state.targetScroll < state.candles.length - 0.1) {
-                refs.isUserInteracting.current = true;
-            }
+            // Mantener interacción activa mientras se arrastra
+            refs.isUserInteracting.current = true;
         };
 
         const handleEnd = () => {

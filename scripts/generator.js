@@ -196,7 +196,7 @@ window.generator = {
                 initialized: false
             };
 
-            const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15;
+            const randomWarmupMinutes = Math.floor(Math.random() * 6) + 10;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
             // Sync reveal: Hold until minimum 1500ms since start of click
@@ -217,8 +217,8 @@ window.generator = {
 
                 if (tabIndex === ctx.activeTab) {
                     ctx.setCurrentDuration(randomDuration / 1000);
-                    // Ensure the state update is reflected in the chart immediately
-                    ctx.setCurrentPriceUI(newBasePrice);
+                    // Ensure the state update is reflected in the UI immediately
+                    if (ctx.setCurrentPriceUI) ctx.setCurrentPriceUI(newBasePrice);
                 }
 
                 ctx.setIsGenerating(false);

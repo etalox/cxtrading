@@ -183,7 +183,7 @@ const MarketSim = () => {
     const getContext = () => ({
         marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
         addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
-        setAssetsInfo, assetHistoryRef, setCurrentDuration, setIsGenerating, canvasRef, resultLabelsRef,
+        setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating, canvasRef, resultLabelsRef,
         zoomCurrentRef, zoomTargetRef
     });
 

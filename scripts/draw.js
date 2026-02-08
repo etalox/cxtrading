@@ -18,16 +18,17 @@ window.draw = {
 
             // Price and Scroll Smoothing
             state.visualValue += (state.currentValue - state.visualValue) * conf.PRICE_SMOOTHING;
-            state.scrollOffset += (state.targetScroll - state.scrollOffset) * conf.SMOOTHING;
+            
+            // [MEJORA] Si el usuario está interactuando, reducir smoothing del scroll para respuesta más rápida
+            const scrollSmoothing = ctx.isUserInteractingRef?.current ? 0.5 : conf.SMOOTHING;
+            state.scrollOffset += (state.targetScroll - state.scrollOffset) * scrollSmoothing;
 
             context.fillStyle = '#050505';
             context.fillRect(0, 0, width, height);
 
-            // FIX 1: Real-time candle drawing using visualTicks for accurate high/low
             const lastClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : state.visualValue;
             let allCandles = [...state.candles];
 
-            // Build forming candle with real-time data from visualTicks
             const formingTicks = state.visualTicks.length > 0 ? state.visualTicks : [state.visualValue];
             const formingHigh = Math.max(...formingTicks, lastClose, state.visualValue);
             const formingLow = Math.min(...formingTicks, lastClose, state.visualValue);
@@ -60,36 +61,53 @@ window.draw = {
 
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
             const getX = (index) => anchorX - (state.scrollOffset - index) * candleWidth + shift;
-            // Instant version without smoothing for trade markers
             const getXInstant = (index) => anchorX - (state.targetScroll - index) * candleWidth + shift;
 
+            // [LÓGICA DE ESCALADO VERTICAL OPTIMIZADA]
             let minPrice = Infinity, maxPrice = -Infinity;
-            allCandles.forEach((c, i) => { const x = getX(i); if (x > -candleWidth && x < width + candleWidth) { if (c.low < minPrice) minPrice = c.low; if (c.high > maxPrice) maxPrice = c.high; } });
-            if (minPrice === Infinity) { minPrice = state.visualValue * 0.99; maxPrice = state.visualValue * 1.01; }
+            let candlesInView = 0;
+
+            allCandles.forEach((c, i) => { 
+                const x = getX(i); 
+                // Añadir un margen de seguridad (candleWidth * 2) para incluir velas parcialmente visibles
+                if (x > -candleWidth * 2 && x < width + candleWidth * 2) { 
+                    if (c.low < minPrice) minPrice = c.low; 
+                    if (c.high > maxPrice) maxPrice = c.high;
+                    candlesInView++;
+                } 
+            });
+
+            // Fallback si no hay velas visibles o valores inválidos
+            if (minPrice === Infinity || candlesInView === 0) { 
+                minPrice = state.visualValue * 0.999; 
+                maxPrice = state.visualValue * 1.001; 
+            } else {
+                // Asegurar que el precio actual SIEMPRE esté considerado en el rango
+                // Esto evita que la línea de precio desaparezca
+                minPrice = Math.min(minPrice, state.visualValue);
+                maxPrice = Math.max(maxPrice, state.visualValue);
+            }
 
             if (typeof state.visualMinPrice === 'undefined') { state.visualMinPrice = minPrice; state.visualMaxPrice = maxPrice; }
+            
             const rawRange = maxPrice - minPrice || 10;
-            const targetPadding = rawRange * yPadding;
-            const targetMin = minPrice - targetPadding;
-            const targetMax = maxPrice + targetPadding;
+            // Padding dinámico: menos padding si el rango es enorme para no aplastar el gráfico
+            const effectivePadding = yPadding; 
+            const targetMin = minPrice - (rawRange * effectivePadding);
+            const targetMax = maxPrice + (rawRange * effectivePadding);
 
-            // Vertical Range Smoothing
-            state.visualMinPrice += (targetMin - state.visualMinPrice) * conf.VERTICAL_SMOOTHING;
-            state.visualMaxPrice += (targetMax - state.visualMaxPrice) * conf.VERTICAL_SMOOTHING;
+            // [CAMBIO CLAVE] Si el usuario interactúa, usar un suavizado mucho más rápido (casi instantáneo)
+            // para que el gráfico no se quede atrás al arrastrar rápido.
+            const verticalSmoothing = ctx.isUserInteractingRef?.current ? 0.3 : conf.VERTICAL_SMOOTHING;
+
+            state.visualMinPrice += (targetMin - state.visualMinPrice) * verticalSmoothing;
+            state.visualMaxPrice += (targetMax - state.visualMaxPrice) * verticalSmoothing;
+            
             let yMin = state.visualMinPrice;
             let yMax = state.visualMaxPrice;
 
-            const currentPriceY = height - ((state.visualValue - yMin) / (yMax - yMin)) * height;
-            const safeZoneBottom = Math.min(height - 250, height * 0.65);
-            if (currentPriceY > safeZoneBottom) {
-                const pixelsOff = currentPriceY - safeZoneBottom;
-                const pricePerPixel = (yMax - yMin) / height;
-                const priceShift = pixelsOff * pricePerPixel;
-                state.visualMinPrice -= priceShift * 0.1;
-                state.visualMaxPrice -= priceShift * 0.1;
-                yMin = state.visualMinPrice;
-                yMax = state.visualMaxPrice;
-            }
+            // Eliminada la lógica compleja de "safeZoneBottom" que desplazaba el gráfico artificialmente
+            // Ahora confiamos puramente en el min/max visibles + padding.
 
             const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * height;
             const currentY = getY(state.visualValue);
@@ -107,7 +125,6 @@ window.draw = {
             const currentCandleIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
             const futureTicksAhead = (previewDuration / 1000 * conf.TICK_RATE);
 
-            // Gray marker: Fixed X position on screen, uses currentY
             const grayMarkerX = anchorX + (futureTicksAhead / state.ticksPerCandle) * candleWidth;
             context.strokeStyle = activeTrades.length > 0 ? '#333' : '#666';
             context.lineWidth = 1;
@@ -140,21 +157,17 @@ window.draw = {
                 context.shadowBlur = 0;
             });
 
-            // Trade entry markers use time-based offset from current position
             activeTrades.forEach(trade => {
                 const yEntry = getY(trade.entryPrice);
-
                 const elapsedSeconds = (Date.now() - trade.startTime) / 1000;
                 const elapsedTicks = elapsedSeconds * conf.TICK_RATE;
                 const entryCandleOffset = elapsedTicks / state.ticksPerCandle;
                 const entryCandleIndex = currentCandleIndex - entryCandleOffset;
                 const xEntry = getXInstant(entryCandleIndex);
-
                 const remainingSeconds = (trade.expiryTime - Date.now()) / 1000;
                 const remainingTicks = remainingSeconds * conf.TICK_RATE;
                 const expireCandleIndex = currentCandleIndex + (remainingTicks / state.ticksPerCandle);
                 const xExpire = getXInstant(expireCandleIndex);
-
                 const tradeColor = trade.type === 'BUY' ? '#10b981' : '#f43f5e';
                 context.strokeStyle = tradeColor;
                 context.lineWidth = 1;
@@ -185,14 +198,9 @@ window.draw = {
             ctx.resultLabelsRef.current.forEach(label => {
                 const age = Date.now() - label.timestamp;
                 const progress = age / 2000;
-
                 const direction = label.profit > 0 ? -1 : 1;
                 const yPos = getY(label.price) - 30 + (progress * 50 * direction);
-                const labelCandleIndex = label.xCandleIndex !== undefined
-                    ? label.xCandleIndex
-                    : (label.xTickIndex !== undefined
-                        ? label.xTickIndex / state.ticksPerCandle
-                        : label.xIndex);
+                const labelCandleIndex = label.xCandleIndex !== undefined ? label.xCandleIndex : (label.xTickIndex !== undefined ? label.xTickIndex / state.ticksPerCandle : label.xIndex);
                 const xPos = getX(labelCandleIndex);
                 const opacity = 1 - Math.pow(progress, 3);
                 context.globalAlpha = opacity;
@@ -216,7 +224,6 @@ window.draw = {
             });
             context.globalAlpha = 1;
 
-            // Gray price label: Fixed X at edge of screen
             const isSmallScreen = width < 768;
             const labelX = isSmallScreen ? 0 : width - 100;
             const textX = isSmallScreen ? 50 : width - 50;

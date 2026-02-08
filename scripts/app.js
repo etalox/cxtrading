@@ -284,24 +284,24 @@ const MarketSim = () => {
 
             if (deltaTime >= window.CONFIG.LOGIC_RATE_MS) {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
+                
+                // Procesar la lógica de mercado (generar velas, etc.)
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
+                
+                lastLogicTimeRef.current += safeTicks * window.CONFIG.LOGIC_RATE_MS;
 
-                if (safeTicks > 1 && !isUserInteractingRef.current) {
+                // [CORRECCIÓN FINAL] Mover Auto-Scroll AQUÍ
+                // Ejecutarlo siempre que haya habido avance (safeTicks > 0), 
+                // no solo si hubo "lag" (safeTicks > 1).
+                if (safeTicks > 0 && !isUserInteractingRef.current) {
                     [0, 1, 2].forEach(idx => { 
                         const s = marketStatesRef.current[idx];
-                        
-                        // 1. Aumentamos tolerancia a 12 velas para que sea fácil "engancharse"
-                        const isNearEnd = s.targetScroll >= s.candles.length - 12.0;
-                        
-                        if (isNearEnd) {
-                            // Actualizamos el objetivo al final real
+                        // Tolerancia generosa para detectar que estamos al final
+                        if (s.targetScroll >= s.candles.length - 12.0) {
                             s.targetScroll = s.candles.length; 
-                            
-                            // 2. [TRUCO] Si el offset visual se está quedando muy atrás (> 5 velas),
-                            // le damos un pequeño empujón suave para que no pierda el ritmo,
-                            // pero SIN igualarlo a targetScroll (que causaría el salto).
+                            // Ayuda suave al offset si se queda atrás
                             if (s.candles.length - s.scrollOffset > 5.0) {
-                                s.scrollOffset += 0.1; // Pequeña ayuda extra a la interpolación
+                                 s.scrollOffset += 0.1;
                             }
                         }
                     });

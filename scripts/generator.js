@@ -25,8 +25,11 @@ window.generator = {
         return { volatility, aggression: 0.1 + (normMat * 0.7), structure, trendBias, isStepped };
     },
 
-    processMarketLogic: (tabIndex, ctx, isWarmup = false) => {
-        const state = ctx.marketStatesRef.current[tabIndex];
+    processMarketLogic: (stateOrTab, ctx, isWarmup = false) => {
+        const isTabIndex = typeof stateOrTab === 'number';
+        const state = isTabIndex ? ctx.marketStatesRef.current[stateOrTab] : stateOrTab;
+        const tabIndex = isTabIndex ? stateOrTab : -1;
+
         const dna = state.dna;
         state.ticksSincePatternChange++;
         if (state.ticksSincePatternChange >= state.nextPatternSwitchTick) {
@@ -94,15 +97,16 @@ window.generator = {
 
         if (tabIndex === ctx.activeTab) {
             window.aiEngine.updatePredictor(state.currentValue, ctx);
-        } else {
+        } else if (isTabIndex) {
             const tickHistory = ctx.tickHistoriesRef.current[tabIndex];
             tickHistory.push(state.currentValue);
             if (tickHistory.length > window.CONFIG.TICK_HISTORY_LIMIT) tickHistory.shift();
         }
     },
 
-    updateVisualCandleLogic: (tabIndex, ctx) => {
-        const state = ctx.marketStatesRef.current[tabIndex];
+    updateVisualCandleLogic: (stateOrTab, ctx) => {
+        const state = typeof stateOrTab === 'number' ? ctx.marketStatesRef.current[stateOrTab] : stateOrTab;
+
         state.visualTicks.push(state.visualValue);
         state.allTicks.push(state.visualValue);
         if (state.allTicks.length > 20000) state.allTicks.shift();
@@ -131,18 +135,17 @@ window.generator = {
         }
     },
 
-    warmUpMarket: (tabIndex, ctx, minutes = 10) => {
-        const state = ctx.marketStatesRef.current[tabIndex];
+    warmUpMarket: (stateOrTab, ctx, minutes = 10) => {
+        const state = typeof stateOrTab === 'number' ? ctx.marketStatesRef.current[stateOrTab] : stateOrTab;
         const ticksToSimulate = minutes * 60 * window.CONFIG.TICK_RATE;
         for (let i = 0; i < ticksToSimulate; i++) {
-            window.generator.processMarketLogic(tabIndex, ctx, true);
-            window.generator.updateVisualCandleLogic(tabIndex, ctx);
+            window.generator.processMarketLogic(state, ctx, true);
+            window.generator.updateVisualCandleLogic(state, ctx);
         }
         state.targetScroll = state.candles.length; state.scrollOffset = state.candles.length; state.initialized = true;
     },
 
-    generateAssetForTab: (tabIndex, ctx) => {
-        const startTime = performance.now();
+    generateAssetForTab: (tabIndex, ctx, startTime = performance.now()) => {
         ctx.setIsGenerating(true);
 
         setTimeout(() => {
@@ -169,7 +172,7 @@ window.generator = {
             };
 
             if (!findAvailableAsset()) {
-                setTimeout(() => window.generator.generateAssetForTab(tabIndex, ctx), 500);
+                setTimeout(() => window.generator.generateAssetForTab(tabIndex, ctx, startTime), 500);
                 return;
             }
 
@@ -182,24 +185,42 @@ window.generator = {
             else preferredDurations = window.CONFIG.DURATIONS;
 
             const randomDuration = preferredDurations[Math.floor(Math.random() * preferredDurations.length)];
-            ctx.tickHistoriesRef.current[tabIndex] = [];
-            ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
-            ctx.marketStatesRef.current[tabIndex] = { ...window.generator.createEmptyState(), currentValue: newBasePrice, visualValue: newBasePrice, tradeDuration: randomDuration, dna: dna, initialized: false };
+
+            // Build the NEW state off-screen
+            const newState = {
+                ...window.generator.createEmptyState(),
+                currentValue: newBasePrice,
+                visualValue: newBasePrice,
+                tradeDuration: randomDuration,
+                dna: dna,
+                initialized: false
+            };
 
             const randomWarmupMinutes = Math.floor(Math.random() * 16) + 15;
-            window.generator.warmUpMarket(tabIndex, ctx, randomWarmupMinutes);
+            window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
-            // Sync reveal with minimum 400ms duration
+            // Sync reveal: Hold until minimum 1500ms since start of click
             const elapsed = performance.now() - startTime;
-            const wait = Math.max(0, 400 - elapsed);
+            const wait = Math.max(0, 1500 - elapsed);
 
             setTimeout(() => {
+                // ATOMIC SWAP: Displace old data and end search animation simultaneously
+                ctx.tickHistoriesRef.current[tabIndex] = [];
+                ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
+                ctx.marketStatesRef.current[tabIndex] = newState;
+
                 ctx.setAssetsInfo(prev => {
                     const next = [...prev];
                     next[tabIndex] = { name: selectedName, price: newBasePrice, change: 0 };
                     return next;
                 });
-                if (tabIndex === ctx.activeTab) ctx.setCurrentDuration(randomDuration / 1000);
+
+                if (tabIndex === ctx.activeTab) {
+                    ctx.setCurrentDuration(randomDuration / 1000);
+                    // Ensure the state update is reflected in the chart immediately
+                    ctx.setCurrentPriceUI(newBasePrice);
+                }
+
                 ctx.setIsGenerating(false);
             }, wait);
         }, 30);

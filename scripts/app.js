@@ -200,7 +200,7 @@ const MarketSim = () => {
         marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
         addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
         setAssetsInfo, assetHistoryRef, setCurrentDuration, setIsGenerating, setCurrentPriceUI, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef
+        zoomCurrentRef, zoomTargetRef, isUserInteractingRef
     });
 
     // 7. INICIALIZACIÓN

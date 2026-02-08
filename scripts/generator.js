@@ -199,9 +199,9 @@ window.generator = {
             const randomWarmupMinutes = Math.floor(Math.random() * 6) + 10;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
-            // Sync reveal: Hold until minimum 1500ms since start of click
+            // Sync reveal: Hold until minimum 400ms since start of click
             const elapsed = performance.now() - startTime;
-            const wait = Math.max(0, 1500 - elapsed);
+            const wait = Math.max(0, 400 - elapsed);
 
             setTimeout(() => {
                 // ATOMIC SWAP: Displace old data and end search animation simultaneously

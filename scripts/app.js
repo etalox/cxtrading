@@ -1,4 +1,5 @@
 const { useState, useEffect, useRef, useCallback } = React;
+const SESSION_VERSION = "20260207.18";
 
 const MarketSim = () => {
     const isMobile = window.innerWidth < 768;
@@ -15,7 +16,11 @@ const MarketSim = () => {
     const [balance, setBalance] = useState(() => {
         try {
             const sessionSaved = sessionStorage.getItem('cx_session_state');
-            if (sessionSaved) return JSON.parse(sessionSaved).balance;
+            if (sessionSaved) {
+                const data = JSON.parse(sessionSaved);
+                if (data.version === SESSION_VERSION) return data.balance;
+                sessionStorage.removeItem('cx_session_state');
+            }
             const saved = localStorage.getItem('cx_balance');
             return saved ? parseFloat(saved) : 100000;
         } catch (e) { return 100000; }
@@ -49,12 +54,14 @@ const MarketSim = () => {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                setAssetsInfo(data.assetsInfo);
-                setActiveTab(data.activeTab);
-                marketStatesRef.current = data.marketStates;
-                tickHistoriesRef.current = data.tickHistories;
-                kinematicsRef.current = data.kinematics;
-                assetHistoryRef.current = data.assetHistory || [];
+                if (data.version === SESSION_VERSION && data.assetsInfo) {
+                    setAssetsInfo(data.assetsInfo);
+                    setActiveTab(data.activeTab || 0);
+                    marketStatesRef.current = data.marketStates;
+                    tickHistoriesRef.current = data.tickHistories;
+                    kinematicsRef.current = data.kinematics;
+                    assetHistoryRef.current = data.assetHistory || [];
+                }
             } catch (e) { console.error("Session restore failed", e); }
         }
     }, []);
@@ -63,6 +70,7 @@ const MarketSim = () => {
     useEffect(() => {
         const interval = setInterval(() => {
             const state = {
+                version: SESSION_VERSION,
                 balance, assetsInfo, activeTab,
                 marketStates: marketStatesRef.current,
                 tickHistories: tickHistoriesRef.current,
@@ -232,21 +240,32 @@ const MarketSim = () => {
     });
 
     useEffect(() => {
+        // FAIL-SAFE: Force isAppReady after 5 seconds to prevent black screen hang
+        const failSafe = setTimeout(() => {
+            if (!isAppReady) {
+                console.warn("Forcing App Ready (Fail-safe)");
+                setIsAppReady(true);
+            }
+        }, 5000);
+
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
             [0, 50, 100].forEach((delay, idx) => setTimeout(() => {
                 window.generator.generateAssetForTab(idx, getContext());
                 if (idx === 0) {
-                    // Start checking when the first asset is ready to clear the splash
                     const checkInit = setInterval(() => {
                         if (marketStatesRef.current[0].initialized) {
                             setIsAppReady(true);
                             clearInterval(checkInit);
+                            clearTimeout(failSafe);
                         }
                     }, 100);
                 }
             }, delay));
+        } else {
+            clearTimeout(failSafe);
         }
+        return () => clearTimeout(failSafe);
     }, []);
 
     const handleTabChange = (index) => {
@@ -382,7 +401,7 @@ const MarketSim = () => {
             <div className={`flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden ${isIntroActive ? 'blur-focus' : ''}`} style={{ height: '100dvh' }}>
                 <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
 
-                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} showIntro={isIntroActive} />
+                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab]?.name || '...'} showIntro={isIntroActive} />
 
                 <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none">
                     <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} showIntro={isIntroActive} />
@@ -419,6 +438,7 @@ const MarketSim = () => {
                     activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
                     currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
                     executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
+                    showIntro={isIntroActive}
                 />
             </div>
         </React.Fragment>

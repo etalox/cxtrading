@@ -125,8 +125,8 @@ window.draw = {
             const currentCandleIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
             const futureTicksAhead = (previewDuration / 1000 * conf.TICK_RATE);
             const futureCandleIndex = currentCandleIndex + (futureTicksAhead / state.ticksPerCandle);
-            const grayMarkerX = getXInstant(futureCandleIndex);
-            const currentX = getXInstant(currentCandleIndex);
+            const grayMarkerX = getX(futureCandleIndex); 
+            const currentX = getX(currentCandleIndex);
 
             context.strokeStyle = activeTrades.length > 0 ? '#333' : '#666';
             context.lineWidth = 1;

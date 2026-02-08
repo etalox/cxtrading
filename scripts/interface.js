@@ -23,25 +23,61 @@ window.Interface = {
         }
     },
 
-    setupZoomAndTouch: (container, refs) => {
+     setupZoomAndTouch: (container, refs) => {
         if (!container) return;
+
+        let zoomTimeout;
 
         const onWheel = (e) => {
             if (window.Interface.isInteractive(e.target)) return;
             e.preventDefault();
             
-            // [CRÍTICO] Activar interacción para evitar que el auto-scroll nos mueva al final
+            // Indicar que el usuario está interactuando
             refs.isUserInteracting.current = true;
-            
-            const factor = e.deltaY > 0 ? 1.06 : 0.94;
-            const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
-            refs.zoomTarget.current = newTarget;
-            refs.setZoom(newTarget);
+            clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => {
+                // Opcional: refs.isUserInteracting.current = false;
+            }, 150);
 
-            // Calcular límites después del zoom
+            // DETECTAR SI ES ZOOM O SCROLL
+            // CtrlKey suele ser true en pinch-to-zoom de trackpads
+            const isZoom = e.ctrlKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) * 2; 
+            
+            // Sin embargo, para trackpads precisos, queremos permitir paneo horizontal
+            // Si el deltaX es significativo, es paneo horizontal.
+            const isHorizontalScroll = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+
+            if (e.ctrlKey) {
+                // --- MODO ZOOM ---
+                const factor = e.deltaY > 0 ? 0.96 : 1.04; // Invertido para sensación natural de trackpad
+                const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
+                refs.zoomTarget.current = newTarget;
+                refs.setZoom(newTarget);
+            } else if (isHorizontalScroll) {
+                // --- MODO SCROLL HORIZONTAL (Trackpad) ---
+                const state = refs.marketStatesRef.current[refs.activeTab.current];
+                const width = container.clientWidth;
+                // Sensibilidad del scroll: ajustar divisor (ej. 2 o 1)
+                const scrollSpeed = 2; 
+                
+                const candleWidth = (width / refs.zoomTarget.current) * (state.ticksPerCandle / 4);
+                const candleDelta = (e.deltaX * scrollSpeed) / candleWidth;
+                
+                // Mover scroll (invertido: arrastrar izquierda = ver futuro, derecha = ver pasado)
+                // Ojo: en trackpad, deslizar dedos a la izquierda (deltaX > 0) suele significar "mover contenido a la izquierda" (ver derecha)
+                state.targetScroll += candleDelta; 
+            } else {
+                 // --- MODO ZOOM NORMAL (Rueda Mouse) ---
+                 const factor = e.deltaY > 0 ? 0.94 : 1.06;
+                 const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
+                 refs.zoomTarget.current = newTarget;
+                 refs.setZoom(newTarget);
+            }
+
+            // --- LÍMITES COMUNES (Aplicar siempre) ---
             const state = refs.marketStatesRef.current[refs.activeTab.current];
             const width = container.clientWidth;
-            const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+            const candleWidth = (width / refs.zoomTarget.current) * (state.ticksPerCandle / 4);
             
             const isSmall = width < 768;
             const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
@@ -49,15 +85,11 @@ window.Interface = {
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
             const minScroll = (anchorX + shift) / candleWidth;
 
-            // [LÓGICA DE LÍMITES CORREGIDA]
-            // Solo forzar posición si nos salimos del rango válido
             if (state.targetScroll < minScroll) {
                 state.targetScroll = minScroll;
             } else if (state.targetScroll > state.candles.length) {
                 state.targetScroll = state.candles.length;
             }
-            // Si estamos dentro del rango (minScroll <= targetScroll <= candles.length), 
-            // NO tocamos targetScroll, manteniendo la posición actual relativa.
         };
 
         let touchActive = false;

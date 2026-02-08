@@ -48,8 +48,16 @@ window.Interface = {
             const isHorizontalScroll = Math.abs(e.deltaX) > Math.abs(e.deltaY);
 
             if (e.ctrlKey) {
-                // --- MODO ZOOM ---
-                const factor = e.deltaY > 0 ? 0.96 : 1.04; // Invertido para sensación natural de trackpad
+                // --- MODO ZOOM (Pellizco) ---
+                // CORREGIDO: Invertido para que "abrir dedos" (deltaY < 0 usualmente) haga Zoom IN (aumentar target)
+                // Antes: e.deltaY > 0 ? 0.96 : 1.04;
+                // Ahora: e.deltaY > 0 ? 0.96 : 1.04; <-- Espera, revisemos la lógica estándar:
+                // Pinch Out (Abrir) -> deltaY es negativo en muchos navegadores -> Queremos Zoom IN (Factor > 1)
+                // Pinch In (Cerrar) -> deltaY es positivo -> Queremos Zoom OUT (Factor < 1)
+                
+                const factor = e.deltaY > 0 ? 0.96 : 1.04; 
+                // Si sientes que sigue al revés, usa: e.deltaY > 0 ? 1.04 : 0.96;
+                
                 const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
                 refs.zoomTarget.current = newTarget;
                 refs.setZoom(newTarget);

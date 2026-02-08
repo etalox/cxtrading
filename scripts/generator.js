@@ -217,7 +217,7 @@ window.generator = {
 
                 if (tabIndex === ctx.activeTab) {
                     ctx.setCurrentDuration(randomDuration / 1000);
-                    // Ensure the state update is reflected in the UI immediately
+                    // Ensure the state update is reflected in the chart immediately
                     if (ctx.setCurrentPriceUI) ctx.setCurrentPriceUI(newBasePrice);
                 }
 

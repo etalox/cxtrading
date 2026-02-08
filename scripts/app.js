@@ -6,26 +6,11 @@ const MarketSim = () => {
     const isMobileRef = useRef(isMobile);
 
     const [activeTab, setActiveTab] = useState(0);
-    const activeTabRef = useRef(0);
-    const [assetsInfo, setAssetsInfo] = useState(() => {
-        try {
-            const saved = localStorage.getItem('cx_assets');
-            return saved ? JSON.parse(saved) : [
-                { name: "INIT 01", price: 1000, change: 0 },
-                { name: "INIT 02", price: 1000, change: 0 },
-                { name: "INIT 03", price: 1000, change: 0 }
-            ];
-        } catch (e) {
-            return [
-                { name: "INIT 01", price: 1000, change: 0 },
-                { name: "INIT 02", price: 1000, change: 0 },
-                { name: "INIT 03", price: 1000, change: 0 }
-            ];
-        }
-    });
-
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
-    const isInitialLoadingRef = useRef(true);
+    const [assetsInfo, setAssetsInfo] = useState([
+        { name: "INIT 01", price: 1000, change: 0 },
+        { name: "INIT 02", price: 1000, change: 0 },
+        { name: "INIT 03", price: 1000, change: 0 }
+    ]);
 
     const [balance, setBalance] = useState(() => {
         try {
@@ -33,10 +18,10 @@ const MarketSim = () => {
             return saved ? parseFloat(saved) : 100000;
         } catch (e) { return 100000; }
     });
-    const balanceRef = useRef(balance);
-    useEffect(() => { balanceRef.current = balance; localStorage.setItem('cx_balance', balance); }, [balance]);
+    useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
 
     const assetHistoryRef = useRef([]);
+
     const marketStatesRef = useRef([window.generator.createEmptyState(), window.generator.createEmptyState(), window.generator.createEmptyState()]);
     const tickHistoriesRef = useRef([[], [], []]);
     const kinematicsRef = useRef([
@@ -47,7 +32,9 @@ const MarketSim = () => {
 
     const lastLogicTimeRef = useRef(Date.now());
     const isTabVisibleRef = useRef(true);
+    const isCatchingUpRef = useRef(false);
 
+    // Refs for interaction handling
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const pinchStartRef = useRef(null);
@@ -57,33 +44,79 @@ const MarketSim = () => {
     const [zoom, setZoom] = useState(INITIAL_ZOOM);
     const zoomTargetRef = useRef(INITIAL_ZOOM);
     const zoomCurrentRef = useRef(INITIAL_ZOOM);
+    const preTradeZoomRef = useRef(null);
 
     const [activeTradesUI, setActiveTradesUI] = useState([]);
-    const activeTradesRef = useRef([]);
-
     const [notifications, setNotifications] = useState([]);
-    const [currentPriceUI, setCurrentPriceUI] = useState(1000);
+    const [currentPriceUI, setCurrentPriceUI] = useState(15868.30);
     const [isGenerating, setIsGenerating] = useState(false);
-    const isGeneratingRef = useRef(false);
-
     const [currentDuration, setCurrentDuration] = useState(10);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [aiConfidence, setAiConfidence] = useState(0);
     const [aiLearnedCount, setAiLearnedCount] = useState(0);
-
-    const [autopilot, setAutopilot] = useState(() => {
-        try {
-            const saved = localStorage.getItem('cx_autopilot');
-            return saved === 'true';
-        } catch (e) { return false; }
-    });
-    const autopilotRef = useRef(autopilot);
-    useEffect(() => { autopilotRef.current = autopilot; localStorage.setItem('cx_autopilot', autopilot); }, [autopilot]);
+    const [autopilot, setAutopilot] = useState(false);
 
     const [buyButtonOpacity, setBuyButtonOpacity] = useState(1);
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
     const touchedButtonsRef = useRef(new Set());
 
+    // Setup interactions using interface.js module
+    useEffect(() => {
+        const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
+        updateMobile();
+        window.addEventListener('resize', updateMobile);
+
+        const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
+            isUserInteracting: isUserInteractingRef.current,
+            zoomTarget: zoomTargetRef,
+            pinchStart: pinchStartRef,
+            lastTouchTarget: lastTouchTargetRef,
+            isUserInteracting: isUserInteractingRef,
+            setZoom: (val) => setZoom(val)
+        });
+
+        const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, {
+            isMobile: isMobileRef
+        });
+
+        const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
+            marketStatesRef,
+            activeTab,
+            zoomCurrentRef,
+            isUserInteracting: isUserInteractingRef
+        });
+
+        return () => {
+            window.removeEventListener('resize', updateMobile);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (cleanupInteractions) cleanupInteractions();
+            if (cleanupResize) cleanupResize();
+            if (cleanupDrag) cleanupDrag();
+        };
+    }, []);
+
+    const autopilotStartBalanceRef = useRef(null);
+    const consecutiveLossesRef = useRef(0);
+
+    useEffect(() => {
+        const hasActiveTrades = activeTradesUI.length > 0;
+        const state = marketStatesRef.current[activeTab];
+        if (hasActiveTrades && (state.zoomTarget || INITIAL_ZOOM) > 200) {
+            preTradeZoomRef.current = state.zoomTarget || INITIAL_ZOOM;
+            isUserInteractingRef.current = false;
+            state.zoomTarget = window.CONFIG.ZOOM_DEFAULT;
+            setZoom(window.CONFIG.ZOOM_DEFAULT);
+        } else if (!hasActiveTrades && preTradeZoomRef.current !== null && !isUserInteractingRef.current) {
+            state.zoomTarget = preTradeZoomRef.current;
+            setZoom(preTradeZoomRef.current);
+            preTradeZoomRef.current = null;
+        }
+    }, [activeTradesUI.length, activeTab]);
+
+    const activeTradesRef = useRef([]);
     const isNotificationVisible = useRef(false);
     const lastSignalRef = useRef(null);
     const lastUIUpdateRef = useRef(0);
@@ -103,44 +136,35 @@ const MarketSim = () => {
                 if (notifications.length <= 1) isNotificationVisible.current = false;
             }, 4000);
         } else { isNotificationVisible.current = true; }
-    }, [notifications.length]);
-
-    const getContext = useCallback(() => ({
-        marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab: activeTabRef.current, aiBrain, setAiConfidence,
-        addNotification, autopilot: autopilotRef.current, activeTradesRef, lastSignalRef, executeTrade: (t) => executeTrade(t), assetsInfo,
-        setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating: (v) => { setIsGenerating(v); isGeneratingRef.current = v; }, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef, setIsInitialLoading: (v) => { setIsInitialLoading(v); isInitialLoadingRef.current = v; }
-    }), [addNotification, assetsInfo]);
-
-    const handleGenerateAsset = useCallback(() => {
-        setIsGenerating(true);
-        isGeneratingRef.current = true;
-        [0, 1, 2].forEach((idx) => window.generator.generateAssetForTab(idx, getContext()));
-    }, [getContext]);
+    }, []);
 
     const executeTrade = (type) => {
-        if (!navigator.onLine || isInitialLoadingRef.current) return;
-        const maxTrades = autopilotRef.current ? 1 : 4;
+        if (!isOnline) return;
+        const maxTrades = autopilot ? 1 : 4;
         if (activeTradesRef.current.length >= maxTrades) return;
+
+        if (autopilot && activeTradesRef.current.length === 0) {
+            if (autopilotStartBalanceRef.current === null) {
+                autopilotStartBalanceRef.current = balance;
+            }
+        }
 
         if (type === 'BUY') { setBuyButtonOpacity(0.5); setTimeout(() => setBuyButtonOpacity(1), 120); }
         else { setSellButtonOpacity(0.5); setTimeout(() => setSellButtonOpacity(1), 120); }
 
         setNotifications(prev => prev.filter(n => n.type !== 'SIGNAL'));
         isNotificationVisible.current = false;
-
-        const state = marketStatesRef.current[activeTabRef.current];
-        const ks = kinematicsRef.current[activeTabRef.current];
+        const state = marketStatesRef.current[activeTab];
+        const ks = kinematicsRef.current[activeTab];
         const currentPreciseIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
         const now = Date.now();
         const duration = state.tradeDuration || 10000;
-
         const newTrade = {
             id: now + Math.random(), type, entryPrice: state.visualValue,
             entryIndex: currentPreciseIndex, entryTickIndex: state.allTicks.length,
             entryCandleIndex: currentPreciseIndex,
             startTime: now, expiryTime: now + duration,
-            amount: window.CONFIG.INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTabRef.current
+            amount: window.CONFIG.INVESTMENT_AMOUNT, aiSnapshot: { ...ks.currentFeatures }, duration: duration, tabIndex: activeTab
         };
         activeTradesRef.current.push(newTrade);
         setActiveTradesUI([...activeTradesRef.current]);
@@ -156,15 +180,28 @@ const MarketSim = () => {
         }
     };
 
+    const getContext = () => ({
+        marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
+        addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
+        setAssetsInfo, assetHistoryRef, setCurrentDuration, setIsGenerating, setCurrentPriceUI, canvasRef, resultLabelsRef,
+        zoomCurrentRef, zoomTargetRef
+    });
+
+    useEffect(() => {
+        if (!marketStatesRef.current[0].initialized) {
+            setIsGenerating(true);
+            [0, 50, 100].forEach((delay, idx) => setTimeout(() => window.generator.generateAssetForTab(idx, getContext()), delay));
+        }
+    }, []);
+
     const handleTabChange = (index) => {
         setActiveTab(index);
-        activeTabRef.current = index;
         const state = marketStatesRef.current[index];
-        if (!state) return;
         state.visualMinPrice = undefined; state.visualMaxPrice = undefined;
         setCurrentDuration(state.tradeDuration / 1000);
         setCurrentPriceUI(state.visualValue);
 
+        // Sync zoom when changing tabs
         if (!isMobileRef.current) {
             const tabZoom = state.zoom || INITIAL_ZOOM;
             zoomTargetRef.current = state.zoomTarget || tabZoom;
@@ -174,46 +211,6 @@ const MarketSim = () => {
     };
 
     useEffect(() => {
-        handleGenerateAsset();
-        const checkDone = setInterval(() => {
-            if (marketStatesRef.current.every(s => s.initialized) && canvasRef.current) {
-                setTimeout(() => { setIsInitialLoading(false); isInitialLoadingRef.current = false; }, 300);
-                clearInterval(checkDone);
-            }
-        }, 100);
-        return () => clearInterval(checkDone);
-    }, []);
-
-    useEffect(() => {
-        const updateMobile = () => { isMobileRef.current = window.innerWidth < 768; };
-        window.addEventListener('resize', updateMobile);
-        const handleVisibilityChange = () => { isTabVisibleRef.current = !document.hidden; };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
-            isUserInteracting: isUserInteractingRef.current,
-            zoomTarget: zoomTargetRef,
-            pinchStart: pinchStartRef,
-            lastTouchTarget: lastTouchTargetRef,
-            isUserInteracting: isUserInteractingRef,
-            setZoom: (val) => setZoom(val)
-        });
-
-        const cleanupResize = window.Interface.setupResizeObserver(containerRef.current, canvasRef.current, { isMobile: isMobileRef });
-        const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
-            marketStatesRef, activeTab: activeTabRef.current, zoomCurrentRef, isUserInteracting: isUserInteractingRef
-        });
-
-        return () => {
-            window.removeEventListener('resize', updateMobile);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            if (cleanupInteractions) cleanupInteractions();
-            if (cleanupResize) cleanupResize();
-            if (cleanupDrag) cleanupDrag();
-        };
-    }, [activeTab]);
-
-    useEffect(() => {
         const handleOnline = () => { setIsOnline(true); setNotifications(prev => prev.filter(n => n.type !== 'OFFLINE')); };
         const handleOffline = () => { setIsOnline(false); addNotification({ type: 'OFFLINE' }); };
         window.addEventListener('online', handleOnline);
@@ -221,44 +218,43 @@ const MarketSim = () => {
         return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
     }, [addNotification]);
 
-    const runMarketLogic = (forceSnap) => {
-        const ctx = getContext();
-        [0, 1, 2].forEach(idx => {
-            window.generator.processMarketLogic(idx, ctx);
-            if (forceSnap) marketStatesRef.current[idx].visualValue = marketStatesRef.current[idx].currentValue;
-            window.generator.updateVisualCandleLogic(idx, ctx);
-        });
-
-        const state = marketStatesRef.current[activeTabRef.current];
-        const ks = kinematicsRef.current[activeTabRef.current];
-        if (state && ks) {
-            const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
-            const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
-            if (isBuy || isSell) aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: Math.floor(state.tradeDuration / 1000 * window.CONFIG.TICK_RATE), featuresSnapshot: { ...ks.currentFeatures } });
-            aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => {
-                if (--t.ticksToWait <= 0) {
-                    window.aiEngine.trainAI(t.featuresSnapshot, (t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice) ? 1 : 0, aiBrain, setAiLearnedCount);
-                    return false;
-                }
-                return true;
-            });
-        }
-    };
-
     useEffect(() => {
         let animationId;
+        const runMarketLogic = (forceSnap) => {
+            const ctx = getContext();
+            [0, 1, 2].forEach(idx => {
+                window.generator.processMarketLogic(idx, ctx);
+                if (forceSnap) marketStatesRef.current[idx].visualValue = marketStatesRef.current[idx].currentValue;
+                window.generator.updateVisualCandleLogic(idx, ctx);
+            });
+
+            const state = marketStatesRef.current[activeTab];
+            const ks = kinematicsRef.current[activeTab];
+            if (state && ks) {
+                const isBuy = ks.currentFeatures?.z < -1.5 && ks.lastVelocity < 0;
+                const isSell = ks.currentFeatures?.z > 1.5 && ks.lastVelocity > 0;
+                if (isBuy || isSell) aiBrain.current.shadowTrades.push({ entryPrice: state.currentValue, type: isBuy ? 'BUY' : 'SELL', ticksToWait: Math.floor(state.tradeDuration / 1000 * window.CONFIG.TICK_RATE), featuresSnapshot: { ...ks.currentFeatures } });
+                aiBrain.current.shadowTrades = aiBrain.current.shadowTrades.filter(t => {
+                    if (--t.ticksToWait <= 0) {
+                        window.aiEngine.trainAI(t.featuresSnapshot, (t.type === 'BUY' ? state.currentValue > t.entryPrice : state.currentValue < t.entryPrice) ? 1 : 0, aiBrain, setAiLearnedCount);
+                        return false;
+                    }
+                    return true;
+                });
+            }
+        };
+
         const loop = () => {
             animationId = requestAnimationFrame(loop);
-            if (!navigator.onLine || !isTabVisibleRef.current || isInitialLoadingRef.current) return;
-
             const now = Date.now();
+            if (!navigator.onLine || !isTabVisibleRef.current) return;
             const deltaTime = now - lastLogicTimeRef.current;
 
             const zoomPct = (window.CONFIG.ZOOM_MAX - zoomCurrentRef.current) / (window.CONFIG.ZOOM_MAX - window.CONFIG.ZOOM_MIN);
             let targetTicksPerCandle = 4;
             if (zoomPct > 0.75) targetTicksPerCandle = 3; else if (zoomPct < 0.25) targetTicksPerCandle = 5;
 
-            if (marketStatesRef.current[activeTabRef.current].ticksPerCandle !== targetTicksPerCandle) {
+            if (marketStatesRef.current[activeTab].ticksPerCandle !== targetTicksPerCandle) {
                 const ctx = getContext();
                 [0, 1, 2].forEach(idx => {
                     marketStatesRef.current[idx].ticksPerCandle = targetTicksPerCandle;
@@ -269,6 +265,7 @@ const MarketSim = () => {
             if (deltaTime >= window.CONFIG.LOGIC_RATE_MS) {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
+                if (safeTicks > 1 && !isUserInteractingRef.current) [0, 1, 2].forEach(idx => { marketStatesRef.current[idx].targetScroll = marketStatesRef.current[idx].candles.length; marketStatesRef.current[idx].scrollOffset = marketStatesRef.current[idx].candles.length; });
                 lastLogicTimeRef.current += safeTicks * window.CONFIG.LOGIC_RATE_MS;
 
                 const realNow = Date.now();
@@ -278,20 +275,24 @@ const MarketSim = () => {
                     expiredTrades.forEach(trade => {
                         const tradeState = marketStatesRef.current[trade.tabIndex];
                         const isWin = trade.type === 'BUY' ? tradeState.visualValue > trade.entryPrice : tradeState.visualValue < trade.entryPrice;
-                        if (autopilotRef.current) {
-                            if (isWin) consecutiveLossesRef.current = 0;
-                            else {
-                                consecutiveLossesRef.current++;
-                                if (consecutiveLossesRef.current >= 3 && balanceRef.current <= (autopilotStartBalanceRef.current || 0) * 0.8) {
+
+                        if (autopilot) {
+                            if (isWin) {
+                                consecutiveLossesRef.current = 0;
+                            } else {
+                                consecutiveLossesRef.current += 1;
+                                // Check for 3 losses + 20% drop
+                                if (consecutiveLossesRef.current >= 3 && balance <= autopilotStartBalanceRef.current * 0.8) {
                                     setAutopilot(false);
                                     addNotification({ type: 'NOTIFICACIÓN', signalType: 'SYSTEM', confidence: 1, message: 'AUTOPILOT TERMINATED BY SAFETY PROTOCOL' });
                                 }
                             }
                         }
+
                         if (trade.aiSnapshot) window.aiEngine.trainAI(trade.aiSnapshot, isWin ? 1 : 0, aiBrain, setAiLearnedCount);
-                        if (trade.tabIndex === activeTabRef.current) {
+                        if (trade.tabIndex === activeTab) {
                             const currentPreciseIndex = tradeState.candles.length + (tradeState.visualTicks.length / tradeState.ticksPerCandle);
-                            resultLabelsRef.current.push({ id: Date.now() + Math.random(), xIndex: currentPreciseIndex, xTickIndex: tradeState.allTicks.length, xCandleIndex: currentPreciseIndex, price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount, timestamp: Date.now(), type: isWin ? 'WIN' : 'LOSS' });
+                            resultLabelsRef.current.push({ id: now + Math.random(), xIndex: currentPreciseIndex, xTickIndex: tradeState.allTicks.length, xCandleIndex: currentPreciseIndex, price: tradeState.currentValue, profit: isWin ? trade.amount * 0.85 : -trade.amount, timestamp: now, type: isWin ? 'WIN' : 'LOSS' });
                         }
                         if (isWin) totalPayout += trade.amount * 1.85;
                     });
@@ -302,76 +303,67 @@ const MarketSim = () => {
             }
 
             if (now - lastUIUpdateRef.current >= window.CONFIG.UI_UPDATE_RATE_MS) {
-                const currentState = marketStatesRef.current[activeTabRef.current];
+                const currentState = marketStatesRef.current[activeTab];
+                if (!isMobileRef.current) {
+                    currentState.zoom = zoom;
+                    currentState.zoomTarget = zoomTargetRef.current;
+                }
                 setCurrentPriceUI(currentState.visualValue);
                 setAssetsInfo(prev => prev.map((info, idx) => ({ ...info, price: marketStatesRef.current[idx].visualValue })));
+                if (activeTradesRef.current.length > 0) setActiveTradesUI([...activeTradesRef.current]);
                 lastUIUpdateRef.current = now;
             }
-
-            // USE FRESH CONTEXT AND REFS IN DRAW
-            window.draw.drawCanvas({
-                canvasRef,
-                marketStatesRef,
-                activeTab: activeTabRef.current,
-                activeTradesRef,
-                zoomCurrentRef,
-                zoomTargetRef,
-                resultLabelsRef
-            });
+            window.draw.drawCanvas(getContext());
         };
+        lastLogicTimeRef.current = Date.now();
         loop();
         return () => cancelAnimationFrame(animationId);
-    }, [isOnline, balance]); // Trigger on connectivity or balance changes
+    }, [zoom, addNotification, activeTab, autopilot, balance]);
 
-    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4) || isInitialLoading || isGenerating;
+    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
     return (
-        <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden animate-blur-reveal" style={{ height: '100dvh', width: '100vw' }}>
-            {isInitialLoading && (
-                <div className="fixed inset-0 bg-[#050505] flex items-center justify-center z-[100]">
-                    <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40 shrink-0" />
+        <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
+            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
+
+            <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
+
+            <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none">
+                <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
+            </div>
+
+            {!isOnline && (
+                <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
+                    <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
+                        <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                        <div className="flex flex-col justify-center items-start gap-1">
+                            <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
+                            <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            <div className="fixed inset-0 z-0 bg-[#050505]" ref={containerRef}>
-                <canvas ref={canvasRef} className="w-full h-full cursor-crosshair block" />
+            <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
+
+            <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
+                <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
+                <div className="flex items-center gap-2">
+                    <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
+                    <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+                </div>
             </div>
 
-            <div className="relative z-10 flex flex-col h-full pointer-events-none">
-                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
-                <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none animate-slide-down-tabs">
-                    <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
-                </div>
-                {!isOnline && (
-                    <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
-                        <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                            <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                            <div className="flex flex-col justify-center items-start gap-1">
-                                <div className="opacity-80 text-white/50 text-[10px] font-normal uppercase">EN ESPERA DE RED...</div>
-                                <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
-                <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
-                    <div className="text-[10px] font-bold text-[#444] tracking-widest uppercase">ADAPTIVE CRITIC</div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
-                        <span className="text-[9px] text-[#555] lowercase">{aiLearnedCount} ops</span>
-                    </div>
-                </div>
-                <window.UI.BottomControls
-                    isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
-                    handleGenerateAsset={handleGenerateAsset}
-                    autopilot={autopilot} setAutopilot={setAutopilot}
-                    sliderPercentage={((zoom - window.CONFIG.ZOOM_MIN) / (window.CONFIG.ZOOM_MAX - window.CONFIG.ZOOM_MIN)) * 100}
-                    zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
-                    activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
-                    currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
-                    executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
-                />
-            </div>
+            <window.UI.BottomControls
+                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
+                handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
+                autopilot={autopilot} setAutopilot={setAutopilot}
+                sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
+                zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
+                activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
+                currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
+                executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
+            />
         </div>
     );
 };

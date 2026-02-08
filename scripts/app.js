@@ -200,7 +200,7 @@ const MarketSim = () => {
         marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
         addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
         setAssetsInfo, assetHistoryRef, setCurrentDuration, setIsGenerating, setCurrentPriceUI, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef, isUserInteractingRef
+        zoomCurrentRef, zoomTargetRef
     });
 
     // 7. INICIALIZACIÓN
@@ -357,7 +357,7 @@ const MarketSim = () => {
         return () => cancelAnimationFrame(animationId);
     }, [zoom, addNotification, activeTab, autopilot, balance]);
 
-    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
+    const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>

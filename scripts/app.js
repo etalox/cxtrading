@@ -380,24 +380,22 @@ const MarketSim = () => {
 
         const now = Date.now();
 
-        // 1. Recortar historial a últimos 10s (10000ms)
-        // Agregamos el nuevo timestamp primero
-        const newHistory = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 30000);
+        // 1. Recortar historial a últimos 10s
+        const newHistory = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 10000);
         searchHistoryRef.current = newHistory;
 
-        // 2. Lógica de Penalización
-        // "Si el usuario buscó más de 10 veces en los últimos 10s"
+        // 2. Lógica de Penalización (>10 búsquedas en 10s)
         if (newHistory.length > 10) {
-            searchPenaltyRef.current += 400; // Acumulativo
+            searchPenaltyRef.current += 200;
         } else {
-            searchPenaltyRef.current = 0; // Reset si se calma
+            searchPenaltyRef.current = 0;
         }
 
-        // 3. Guardar persistencia
+        // 3. Persistencia
         localStorage.setItem('cx_searchHistory', JSON.stringify(searchHistoryRef.current));
         localStorage.setItem('cx_searchPenalty', searchPenaltyRef.current.toString());
 
-        // 4. Ejecutar con delay
+        // 4. Ejecutar
         setIsGenerating(true);
         setTimeout(() => {
             window.generator.generateAssetForTab(activeTab, getContext());
@@ -440,7 +438,7 @@ const MarketSim = () => {
 
             <window.UI.BottomControls
                 isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobileRef.current}
-                handleGenerateAsset={handleGenerateAsset}}
+                handleGenerateAsset={handleGenerateAsset}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}

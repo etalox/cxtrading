@@ -45,9 +45,20 @@ const MarketSim = () => {
     const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
     const resultLabelsRef = useRef([]);
 
-    // Refs para penalización de búsqueda
-    const searchHistoryRef = useRef([]); // timestamps (ms)
+    // [MOD] Refs para penalización de búsqueda
+    const searchHistoryRef = useRef([]); 
     const searchPenaltyRef = useRef(0);
+
+    // [MOD] Cargar persistencia al inicio
+    useEffect(() => {
+        try {
+            const savedHist = localStorage.getItem('cx_searchHistory');
+            if (savedHist) searchHistoryRef.current = JSON.parse(savedHist);
+
+            const savedPen = localStorage.getItem('cx_searchPenalty');
+            if (savedPen) searchPenaltyRef.current = parseInt(savedPen);
+        } catch (e) { console.error("Error loading search persistence", e); }
+    }, []);
 
     // 3. ESTADOS DE REACT
     const [activeTab, setActiveTab] = useState(0);
@@ -363,36 +374,37 @@ const MarketSim = () => {
 
     
     const handleGenerateAsset = () => {
-        // No permitir doble click ni reentradas
         if (isGenerating) return;
         if (!isOnline) return;
         if (activeTradesRef.current.length > 0) return;
 
         const now = Date.now();
 
-        // Contar cuántas búsquedas han ocurrido en los últimos 10s
-        searchHistoryRef.current = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 20000);
-        const countLastXs = searchHistoryRef.current.length;
+        // 1. Recortar historial a últimos 10s (10000ms)
+        // Agregamos el nuevo timestamp primero
+        const newHistory = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 30000);
+        searchHistoryRef.current = newHistory;
 
-        // Si el usuario buscó más de 10 veces durante los últimos 10 segundos,
-        // agregar penalización acumulativa (200ms por búsqueda)
-        if (countLastXs > 10) {
-            searchPenaltyRef.current += 200;
+        // 2. Lógica de Penalización
+        // "Si el usuario buscó más de 10 veces en los últimos 10s"
+        if (newHistory.length > 10) {
+            searchPenaltyRef.current += 400; // Acumulativo
         } else {
-            // Si baja del umbral, se elimina la penalización acumulada
-            searchPenaltyRef.current = 0;
+            searchPenaltyRef.current = 0; // Reset si se calma
         }
 
-        // Bloquear UI inmediatamente (la animación de loader empieza ya)
-        setIsGenerating(true);
+        // 3. Guardar persistencia
+        localStorage.setItem('cx_searchHistory', JSON.stringify(searchHistoryRef.current));
+        localStorage.setItem('cx_searchPenalty', searchPenaltyRef.current.toString());
 
-        // Esperar la penalización y luego generar
+        // 4. Ejecutar con delay
+        setIsGenerating(true);
         setTimeout(() => {
             window.generator.generateAssetForTab(activeTab, getContext());
         }, searchPenaltyRef.current);
     };
 
-const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
+    const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
@@ -428,7 +440,7 @@ const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef
 
             <window.UI.BottomControls
                 isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobileRef.current}
-                handleGenerateAsset={handleGenerateAsset}
+                handleGenerateAsset={handleGenerateAsset}}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}

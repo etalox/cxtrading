@@ -124,13 +124,15 @@ window.draw = {
             const previewDuration = state.tradeDuration || 10000;
             const currentCandleIndex = state.candles.length + (state.visualTicks.length / state.ticksPerCandle);
             const futureTicksAhead = (previewDuration / 1000 * conf.TICK_RATE);
+            const futureCandleIndex = currentCandleIndex + (futureTicksAhead / state.ticksPerCandle);
+            const grayMarkerX = getXInstant(futureCandleIndex);
+            const currentX = getXInstant(currentCandleIndex);
 
-            const grayMarkerX = anchorX + (futureTicksAhead / state.ticksPerCandle) * candleWidth;
             context.strokeStyle = activeTrades.length > 0 ? '#333' : '#666';
             context.lineWidth = 1;
             context.setLineDash([2, 4]);
             context.beginPath();
-            context.moveTo(anchorX, currentY);
+            context.moveTo(currentX, currentY); 
             context.lineTo(grayMarkerX, currentY);
             context.stroke();
             context.beginPath();

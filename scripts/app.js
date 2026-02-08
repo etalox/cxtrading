@@ -381,7 +381,7 @@ const MarketSim = () => {
         const now = Date.now();
 
         // 1. Recortar historial a últimos 10s
-        const newHistory = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 10000);
+        const newHistory = [...searchHistoryRef.current, now].filter(ts => (now - ts) < 30000);
         searchHistoryRef.current = newHistory;
 
         // 2. Lógica de Penalización (>10 búsquedas en 10s)

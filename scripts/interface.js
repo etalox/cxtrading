@@ -55,13 +55,13 @@ window.Interface = {
                 // Pinch Out (Abrir) -> deltaY es negativo en muchos navegadores -> Queremos Zoom IN (Factor > 1)
                 // Pinch In (Cerrar) -> deltaY es positivo -> Queremos Zoom OUT (Factor < 1)
                 
-                const factor = e.deltaY > 0 ? 0.96 : 1.04; 
+                const factor = e.deltaY > 0 ? 1.04 : 0.96; 
                 // Si sientes que sigue al revés, usa: e.deltaY > 0 ? 1.04 : 0.96;
                 
                 const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
                 refs.zoomTarget.current = newTarget;
                 refs.setZoom(newTarget);
-            } else if (isHorizontalScroll) {
+            }  else if (isHorizontalScroll) {
                 // --- MODO SCROLL HORIZONTAL (Trackpad) ---
                 const state = refs.marketStatesRef.current[refs.activeTab.current];
                 const width = container.clientWidth;

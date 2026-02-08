@@ -34,6 +34,18 @@ window.Interface = {
             const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
             refs.zoomTarget.current = newTarget;
             refs.setZoom(newTarget);
+
+            // Enforce boundary after zoom
+            const state = refs.marketStatesRef.current[refs.activeTab];
+            const dpr = window.devicePixelRatio || 1;
+            const width = container.clientWidth;
+            const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+            const isSmall = width < 768;
+            const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
+            const anchorX = width * anchorDefault;
+            const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+            const minScroll = (anchorX + shift) / candleWidth;
+            if (state.targetScroll < minScroll) state.targetScroll = minScroll;
         };
 
         let touchActive = false;
@@ -60,6 +72,18 @@ window.Interface = {
                 const newTarget = Math.max(80, Math.min(500, Math.round(refs.zoomTarget.current * ratio)));
                 refs.zoomTarget.current = newTarget;
                 refs.setZoom(newTarget);
+
+                // Enforce boundary after zoom
+                const state = refs.marketStatesRef.current[refs.activeTab];
+                const dpr = window.devicePixelRatio || 1;
+                const width = container.clientWidth;
+                const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+                const isSmall = width < 768;
+                const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
+                const anchorX = width * anchorDefault;
+                const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+                const minScroll = (anchorX + shift) / candleWidth;
+                if (state.targetScroll < minScroll) state.targetScroll = minScroll;
             }
         };
 
@@ -116,23 +140,17 @@ window.Interface = {
             // Update targetScroll (dragging left moves chart right, so index decreases)
             const newTarget = startTargetScroll - candleDelta;
 
-            // Dynamic clamping: allow current price (index candles.length) to reach x = 0
-            // getX(i) = anchorX - (scroll - i) * candleWidth + shift
-            // To reach x = 0 for i = state.candles.length: 
-            // scroll = state.candles.length + (anchorX + shift) / candleWidth
-
+            // Limit scroll: Left extreme (constrained) to Right extreme (candles.length)
             const isSmall = width < 768;
-            const anchorPercent = refs.isMobile.current ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
-            const anchorX = width * (state.currentAnchor || anchorPercent);
+            const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
+            const anchorX = width * anchorDefault;
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
+            const minScroll = (anchorX + shift) / candleWidth;
 
-            const maxScroll = state.candles.length + (anchorX + shift) / candleWidth;
-            const minScroll = 0 - (width - (anchorX + shift)) / candleWidth;
-
-            state.targetScroll = Math.max(minScroll, Math.min(maxScroll, newTarget));
+            state.targetScroll = Math.max(minScroll, Math.min(state.candles.length, newTarget));
 
             // If the user drags away from the end, we consider them interacting
-            if (state.targetScroll < maxScroll - 0.5) {
+            if (state.targetScroll < state.candles.length - 0.1) {
                 refs.isUserInteracting.current = true;
             } else {
                 // If they drag back to the very end, we can resume auto-scroll later

@@ -12,6 +12,11 @@ const MarketSim = () => {
         { name: "INIT 03", price: 1000, change: 0 }
     ]);
 
+    const activeTabRef = useRef(activeTab);
+    useEffect(() => {
+    activeTabRef.current = activeTab;
+    }, [activeTab]);
+
     const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
     isUserInteracting: isUserInteractingRef, // Corregido: pasar ref, no valor
     zoomTarget: zoomTargetRef,

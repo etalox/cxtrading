@@ -1,5 +1,4 @@
 const { useState, useEffect, useRef, useCallback } = React;
-const SESSION_VERSION = "20260207.19";
 
 const MarketSim = () => {
     const isMobile = window.innerWidth < 768;
@@ -15,28 +14,11 @@ const MarketSim = () => {
 
     const [balance, setBalance] = useState(() => {
         try {
-            const sessionSaved = sessionStorage.getItem('cx_session_state');
-            if (sessionSaved) {
-                const data = JSON.parse(sessionSaved);
-                if (data.version === SESSION_VERSION) return data.balance;
-                sessionStorage.removeItem('cx_session_state');
-            }
             const saved = localStorage.getItem('cx_balance');
             return saved ? parseFloat(saved) : 100000;
         } catch (e) { return 100000; }
     });
     useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
-
-    const [isIntroActive, setIsIntroActive] = useState(() => !sessionStorage.getItem('cx_session_state'));
-    const [isAppReady, setIsAppReady] = useState(() => !!sessionStorage.getItem('cx_session_state'));
-
-    useEffect(() => {
-        if (isIntroActive) {
-            setTimeout(() => {
-                setIsIntroActive(false);
-            }, 600); // 400ms + some buffer
-        }
-    }, []);
 
     const assetHistoryRef = useRef([]);
 
@@ -47,47 +29,6 @@ const MarketSim = () => {
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
     ]);
-
-    // Session Restore
-    useEffect(() => {
-        const saved = sessionStorage.getItem('cx_session_state');
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                if (data.version === SESSION_VERSION && data.assetsInfo && data.marketStates) {
-                    setAssetsInfo(data.assetsInfo);
-                    setActiveTab(data.activeTab || 0);
-                    marketStatesRef.current = data.marketStates;
-                    tickHistoriesRef.current = data.tickHistories;
-                    kinematicsRef.current = data.kinematics;
-                    assetHistoryRef.current = data.assetHistory || [];
-                    setIsAppReady(true);
-                    setIsIntroActive(false);
-                } else {
-                    sessionStorage.removeItem('cx_session_state');
-                }
-            } catch (e) {
-                console.error("Session restore failed", e);
-                sessionStorage.removeItem('cx_session_state');
-            }
-        }
-    }, []);
-
-    // Session Save
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const state = {
-                version: SESSION_VERSION,
-                balance, assetsInfo, activeTab,
-                marketStates: marketStatesRef.current,
-                tickHistories: tickHistoriesRef.current,
-                kinematics: kinematicsRef.current,
-                assetHistory: assetHistoryRef.current
-            };
-            sessionStorage.setItem('cx_session_state', JSON.stringify(state));
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [balance, assetsInfo, activeTab]);
 
     const lastLogicTimeRef = useRef(Date.now());
     const isTabVisibleRef = useRef(true);
@@ -118,6 +59,60 @@ const MarketSim = () => {
     const [buyButtonOpacity, setBuyButtonOpacity] = useState(1);
     const [sellButtonOpacity, setSellButtonOpacity] = useState(1);
     const touchedButtonsRef = useRef(new Set());
+
+    const [isIntroActive, setIsIntroActive] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+    // Session Persistence
+    const saveToSession = useCallback(() => {
+        const stateToSave = {
+            balance,
+            assetsInfo,
+            marketStates: marketStatesRef.current,
+            tickHistories: tickHistoriesRef.current,
+            activeTab,
+            currentDuration,
+            autopilot
+        };
+        sessionStorage.setItem('cx_session_state', JSON.stringify(stateToSave));
+    }, [balance, assetsInfo, activeTab, currentDuration, autopilot]);
+
+    const loadFromSession = () => {
+        try {
+            const saved = sessionStorage.getItem('cx_session_state');
+            if (!saved) return false;
+            const data = JSON.parse(saved);
+            setBalance(data.balance);
+            setAssetsInfo(data.assetsInfo);
+            marketStatesRef.current = data.marketStates;
+            tickHistoriesRef.current = data.tickHistories;
+            setActiveTab(data.activeTab);
+            setCurrentDuration(data.currentDuration);
+            setAutopilot(data.autopilot);
+            return true;
+        } catch (e) { return false; }
+    };
+
+    useEffect(() => {
+        const hasSession = loadFromSession();
+        if (!hasSession) {
+            setIsIntroActive(true);
+            setTimeout(() => {
+                setIsIntroActive(false);
+                setIsInitialLoading(false);
+                if (assetsInfo[0].name === "INIT 01") {
+                    setIsGenerating(true);
+                    [0, 50, 100].forEach((delay, idx) => setTimeout(() => window.generator.generateAssetForTab(idx, getContext()), delay));
+                }
+            }, 400);
+        } else {
+            setIsInitialLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isInitialLoading) saveToSession();
+    }, [balance, assetsInfo, activeTab, currentDuration, autopilot, isInitialLoading, saveToSession]);
 
     // Setup interactions using interface.js module
     useEffect(() => {
@@ -243,34 +238,24 @@ const MarketSim = () => {
         marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
         addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
         setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef, isAppReady
+        zoomCurrentRef, zoomTargetRef, isIntroActive
     });
 
     useEffect(() => {
-        // BULLETPROOF FAIL-SAFE: Force reveal after 3 seconds max
-        const revealTimer = setTimeout(() => {
-            setIsAppReady(true);
-            setIsIntroActive(false);
-        }, 3000);
-
-        if (!marketStatesRef.current[0].initialized) {
-            setIsGenerating(true);
-            [0, 50, 100].forEach((delay, idx) => setTimeout(() => {
-                window.generator.generateAssetForTab(idx, getContext());
-                if (idx === 0) {
-                    const checkInit = setInterval(() => {
-                        if (marketStatesRef.current[0].initialized) {
-                            setIsAppReady(true);
-                            clearInterval(checkInit);
-                        }
-                    }, 100);
+        const hasSession = loadFromSession();
+        if (!hasSession) {
+            setIsIntroActive(true);
+            setTimeout(() => {
+                setIsIntroActive(false);
+                setIsInitialLoading(false);
+                if (assetsInfo[0].name === "INIT 01") {
+                    setIsGenerating(true);
+                    [0, 50, 100].forEach((delay, idx) => setTimeout(() => window.generator.generateAssetForTab(idx, getContext()), delay));
                 }
-            }, delay));
+            }, 400);
         } else {
-            setIsAppReady(true);
-            setIsIntroActive(false);
+            setIsInitialLoading(false);
         }
-        return () => clearTimeout(revealTimer);
     }, []);
 
     const handleTabChange = (index) => {
@@ -399,54 +384,65 @@ const MarketSim = () => {
         return () => cancelAnimationFrame(animationId);
     }, [zoom, addNotification, activeTab, autopilot, balance]);
 
+    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
+
+    const activeState = marketStatesRef.current[activeTab];
+    const isChartReady = activeState && activeState.initialized;
+
     return (
-        <React.Fragment>
-            {!isAppReady && <window.UI.LoadingSplash />}
+        <div className={`flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden animate-focus-in`} style={{ height: '100dvh' }}>
+            {isInitialLoading && <window.UI.LoadingSplash />}
 
-            <div className={`flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden ${isIntroActive ? 'blur-focus' : ''}`} style={{ height: '100dvh' }}>
-                <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
-
-                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab]?.name || '...'} showIntro={isIntroActive} />
-
-                <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none">
-                    <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} showIntro={isIntroActive} />
-                </div>
-
-                {!isOnline && (
-                    <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
-                        <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                            <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                            <div className="flex flex-col justify-center items-start gap-1">
-                                <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
-                                <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
-                            </div>
-                        </div>
+            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
+                {isChartReady ? (
+                    <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center opacity-20">
+                        <div className="text-xl font-light tracking-[0.2em] uppercase">MERCADO NO INICIALIZADO</div>
                     </div>
                 )}
+            </div>
 
-                <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
+            <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} isIntroActive={isIntroActive} />
 
-                <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
-                    <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
-                        <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+            <div className={`absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none ${isIntroActive ? 'animate-intro-top' : ''}`}>
+                <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} isIntroActive={isIntroActive} />
+            </div>
+
+            {!isOnline && (
+                <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
+                    <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
+                        <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                        <div className="flex flex-col justify-center items-start gap-1">
+                            <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
+                            <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                <window.UI.BottomControls
-                    isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
-                    handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
-                    autopilot={autopilot} setAutopilot={setAutopilot}
-                    sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
-                    zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
-                    activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
-                    currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
-                    executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
-                    showIntro={isIntroActive}
-                />
+            <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
+
+            <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
+                <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
+                <div className="flex items-center gap-2">
+                    <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
+                    <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+                </div>
             </div>
-        </React.Fragment>
+
+            <window.UI.BottomControls
+                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
+                handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
+                autopilot={autopilot} setAutopilot={setAutopilot}
+                sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
+                zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
+                activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
+                currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
+                executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
+                isIntroActive={isIntroActive}
+            />
+        </div>
     );
 };
 

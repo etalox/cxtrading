@@ -1,8 +1,8 @@
 const { useState, useEffect, useRef } = React;
 
 window.UI = {
-    Header: ({ balance, currentPriceUI, isGenerating, activeAssetName, showIntro }) => (
-        <div className={`absolute top-10 left-0 w-full px-6 md:px-10 flex justify-between items-center z-20 pointer-events-none ${showIntro ? 'animate-intro-top' : ''}`}>
+    Header: ({ balance, currentPriceUI, isGenerating, activeAssetName, isIntroActive }) => (
+        <div className={`absolute top-10 left-0 w-full px-6 md:px-10 flex justify-between items-center z-20 pointer-events-none ${isIntroActive ? 'animate-intro-top' : ''}`}>
             <div className="flex flex-col justify-center items-start gap-2">
                 <div className="opacity-50 text-[10px] font-normal leading-tight">BALANCE GLOBAL</div>
                 <div className="text-sm font-normal leading-tight">${balance.toLocaleString()}</div>
@@ -20,8 +20,8 @@ window.UI = {
         </div>
     ),
 
-    AssetTabs: ({ assetsInfo, activeTab, onTabChange, showIntro }) => (
-        <div className={`hidden md:flex items-center gap-[10px] pointer-events-auto ${showIntro ? 'animate-intro-top' : ''}`}>
+    AssetTabs: ({ assetsInfo, activeTab, onTabChange, isIntroActive }) => (
+        <div className={`hidden md:flex items-center gap-[10px] pointer-events-auto ${isIntroActive ? 'animate-intro-top' : ''}`}>
             {assetsInfo.map((info, idx) => {
                 const isActive = activeTab === idx;
                 return (
@@ -48,12 +48,6 @@ window.UI = {
                     </div>
                 );
             })}
-        </div>
-    ),
-
-    LoadingSplash: () => (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#0a0a0a]">
-            <img src={window.ICONS.loader} className="w-12 h-12 animate-spin opacity-40" />
         </div>
     ),
 
@@ -93,8 +87,7 @@ window.UI = {
         isGenerating, isOnline, isMobile, handleGenerateAsset,
         autopilot, setAutopilot, sliderPercentage, zoom, setZoom,
         activeTradesUI, buyButtonOpacity, sellButtonOpacity, currentDuration,
-        handleTouchStart, handleTouchEnd, executeTrade, tradesDisabled, balance,
-        showIntro
+        handleTouchStart, handleTouchEnd, executeTrade, tradesDisabled, balance, isIntroActive
     }) => {
         const buyTrades = activeTradesUI.filter(t => t.type === 'BUY');
         const sellTrades = activeTradesUI.filter(t => t.type === 'SELL');
@@ -104,7 +97,7 @@ window.UI = {
         const sellRemaining = mostRecentSell ? Math.max(0, (mostRecentSell.expiryTime - Date.now()) / 1000) : 0;
 
         return (
-            <div className={`absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto ${showIntro ? 'animate-intro-bottom' : ''}`}>
+            <div className={`absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 z-30 w-[95%] md:w-auto ${isIntroActive ? 'animate-intro-bottom' : ''}`}>
                 <div className="glass-panel p-2 flex flex-col md:flex-row items-center gap-4 md:gap-8">
                     <button
                         onClick={handleGenerateAsset}
@@ -179,5 +172,11 @@ window.UI = {
                 </div>
             </div>
         );
-    }
+    },
+
+    LoadingSplash: () => (
+        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+            <div className="w-16 h-16 flex items-center justify-center border-4 border-white/10 border-t-white rounded-full animate-spin"></div>
+        </div>
+    )
 };

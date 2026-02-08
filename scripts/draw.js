@@ -9,6 +9,11 @@ window.draw = {
             context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             const state = ctx.marketStatesRef.current[ctx.activeTab];
+            if (!state || !state.initialized) {
+                context.fillStyle = '#050505';
+                context.fillRect(0, 0, width, height);
+                return;
+            }
             const activeTrades = ctx.activeTradesRef.current.filter(t => t.tabIndex === ctx.activeTab);
 
             const conf = window.CONFIG;

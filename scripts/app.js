@@ -14,11 +14,24 @@ const MarketSim = () => {
 
     const [balance, setBalance] = useState(() => {
         try {
+            const sessionSaved = sessionStorage.getItem('cx_session_state');
+            if (sessionSaved) return JSON.parse(sessionSaved).balance;
             const saved = localStorage.getItem('cx_balance');
             return saved ? parseFloat(saved) : 100000;
         } catch (e) { return 100000; }
     });
     useEffect(() => { localStorage.setItem('cx_balance', balance); }, [balance]);
+
+    const [isIntroActive, setIsIntroActive] = useState(() => !sessionStorage.getItem('cx_session_state'));
+    const [isAppReady, setIsAppReady] = useState(() => !!sessionStorage.getItem('cx_session_state'));
+
+    useEffect(() => {
+        if (isIntroActive) {
+            setTimeout(() => {
+                setIsIntroActive(false);
+            }, 600); // 400ms + some buffer
+        }
+    }, []);
 
     const assetHistoryRef = useRef([]);
 
@@ -29,6 +42,37 @@ const MarketSim = () => {
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 },
         { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 }
     ]);
+
+    // Session Restore
+    useEffect(() => {
+        const saved = sessionStorage.getItem('cx_session_state');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                setAssetsInfo(data.assetsInfo);
+                setActiveTab(data.activeTab);
+                marketStatesRef.current = data.marketStates;
+                tickHistoriesRef.current = data.tickHistories;
+                kinematicsRef.current = data.kinematics;
+                assetHistoryRef.current = data.assetHistory || [];
+            } catch (e) { console.error("Session restore failed", e); }
+        }
+    }, []);
+
+    // Session Save
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const state = {
+                balance, assetsInfo, activeTab,
+                marketStates: marketStatesRef.current,
+                tickHistories: tickHistoriesRef.current,
+                kinematics: kinematicsRef.current,
+                assetHistory: assetHistoryRef.current
+            };
+            sessionStorage.setItem('cx_session_state', JSON.stringify(state));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [balance, assetsInfo, activeTab]);
 
     const lastLogicTimeRef = useRef(Date.now());
     const isTabVisibleRef = useRef(true);
@@ -190,7 +234,18 @@ const MarketSim = () => {
     useEffect(() => {
         if (!marketStatesRef.current[0].initialized) {
             setIsGenerating(true);
-            [0, 50, 100].forEach((delay, idx) => setTimeout(() => window.generator.generateAssetForTab(idx, getContext()), delay));
+            [0, 50, 100].forEach((delay, idx) => setTimeout(() => {
+                window.generator.generateAssetForTab(idx, getContext());
+                if (idx === 0) {
+                    // Start checking when the first asset is ready to clear the splash
+                    const checkInit = setInterval(() => {
+                        if (marketStatesRef.current[0].initialized) {
+                            setIsAppReady(true);
+                            clearInterval(checkInit);
+                        }
+                    }, 100);
+                }
+            }, delay));
         }
     }, []);
 
@@ -320,51 +375,53 @@ const MarketSim = () => {
         return () => cancelAnimationFrame(animationId);
     }, [zoom, addNotification, activeTab, autopilot, balance]);
 
-    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
-
     return (
-        <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
-            <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
+        <React.Fragment>
+            {!isAppReady && <window.UI.LoadingSplash />}
 
-            <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} />
+            <div className={`flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden ${isIntroActive ? 'blur-focus' : ''}`} style={{ height: '100dvh' }}>
+                <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}><canvas ref={canvasRef} className="w-full h-full cursor-crosshair" /></div>
 
-            <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none">
-                <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} />
-            </div>
+                <window.UI.Header balance={balance} currentPriceUI={currentPriceUI} isGenerating={isGenerating} activeAssetName={assetsInfo[activeTab].name} showIntro={isIntroActive} />
 
-            {!isOnline && (
-                <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
-                    <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
-                        <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
-                        <div className="flex flex-col justify-center items-start gap-1">
-                            <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
-                            <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                <div className="absolute top-10 left-0 w-full flex justify-center z-20 pointer-events-none">
+                    <window.UI.AssetTabs assetsInfo={assetsInfo} activeTab={activeTab} onTabChange={handleTabChange} showIntro={isIntroActive} />
+                </div>
+
+                {!isOnline && (
+                    <div className="absolute top-[100px] md:top-[140px] w-full flex justify-center z-30 pointer-events-none px-4">
+                        <div className="glass-panel px-6 h-16 flex items-center justify-center gap-3 animate-fade-in text-white/90">
+                            <img src={window.ICONS.wifiOff} className="w-5 h-5 opacity-80" />
+                            <div className="flex flex-col justify-center items-start gap-1">
+                                <div className="opacity-80 text-white/50 text-[10px] font-normal">EN ESPERA DE RED...</div>
+                                <div className="text-sm font-medium">SIN CONEXIÃ“N Wi-Fi</div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
+                <window.UI.NotificationList notifications={notifications} onNotificationClick={(note) => note.type === 'SIGNAL' && executeTrade(note.signalType)} />
 
-            <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
-                <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
-                <div className="flex items-center gap-2">
-                    <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
-                    <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+                <div className="absolute top-28 left-6 md:left-10 z-10 flex flex-col gap-1 pointer-events-none opacity-40">
+                    <div className="text-[10px] font-bold text-[#444] tracking-widest">ADAPTIVE CRITIC</div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-10 h-1 bg-[#222] rounded-full overflow-hidden"><div className="h-full bg-white/40" style={{ width: `${aiConfidence * 100}%` }}></div></div>
+                        <span className="text-[9px] text-[#555]">{aiLearnedCount} OPS</span>
+                    </div>
                 </div>
+
+                <window.UI.BottomControls
+                    isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
+                    handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
+                    autopilot={autopilot} setAutopilot={setAutopilot}
+                    sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
+                    zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
+                    activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
+                    currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
+                    executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
+                />
             </div>
-
-            <window.UI.BottomControls
-                isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobile}
-                handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
-                autopilot={autopilot} setAutopilot={setAutopilot}
-                sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
-                zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}
-                activeTradesUI={activeTradesUI} buyButtonOpacity={buyButtonOpacity} sellButtonOpacity={sellButtonOpacity}
-                currentDuration={currentDuration} handleTouchStart={handleTouchStart} handleTouchEnd={handleTouchEnd}
-                executeTrade={executeTrade} tradesDisabled={tradesDisabled} balance={balance}
-            />
-        </div>
+        </React.Fragment>
     );
 };
 

@@ -43,7 +43,11 @@ const MarketSim = () => {
     const lastSignalRef = useRef(null);
     const lastUIUpdateRef = useRef(0);
     const aiBrain = useRef({ weights: { velocity: 0.8, acceleration: 1.2, zScore: 0.6, duration: -0.5, bias: 0.1 }, learningRate: 0.05, history: [], shadowTrades: [] });
+    
     const resultLabelsRef = useRef([]);
+    // Refs para lógica de penalización de búsqueda
+    const searchHistoryRef = useRef([]); // [{ timestamp, isRapid }]
+    const searchPenaltyRef = useRef(0);
 
     // 3. ESTADOS DE REACT
     const [activeTab, setActiveTab] = useState(0);
@@ -357,7 +361,43 @@ const MarketSim = () => {
         return () => cancelAnimationFrame(animationId);
     }, [zoom, addNotification, activeTab, autopilot, balance]);
 
-    const tradesDisabled = isGenerating || !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
+    
+    const handleGenerateClick = () => {
+        if (isGenerating) return;
+
+        const now = Date.now();
+        const history = searchHistoryRef.current;
+
+        // 1. Calcular si es búsqueda rápida (< 1000ms desde la anterior)
+        const lastTimestamp = history.length > 0 ? history[history.length - 1].timestamp : 0;
+        const diff = now - lastTimestamp;
+        const isRapid = diff < 1000;
+
+        // 2. Actualizar historial (Máx 10)
+        history.push({ timestamp: now, isRapid });
+        if (history.length > 10) history.shift();
+
+        // 3. Contar rápidas en las últimas 10
+        const rapidCount = history.filter(h => h.isRapid).length;
+
+        // 4. Lógica de Penalización
+        // "Si de las últimas 10... al menos 5 fueron rápidas"
+        if (rapidCount >= 5) {
+            searchPenaltyRef.current += 200; // Acumulativo
+        } else {
+            searchPenaltyRef.current = 0; // Reset si el comportamiento mejora
+        }
+
+        // 5. Ejecutar
+        setIsGenerating(true); // Bloquear UI inmediatamente
+
+        // Aplicar el delay calculado antes de llamar al generador
+        setTimeout(() => {
+            window.generator.generateAssetForTab(activeTab, getContext());
+        }, searchPenaltyRef.current);
+    };
+
+    const tradesDisabled = !isOnline || autopilot || activeTradesRef.current.length >= (autopilot ? 1 : 4);
 
     return (
         <div className="flex flex-col h-[100dvh] relative bg-[#050505] text-white font-sans overflow-hidden" style={{ height: '100dvh' }}>
@@ -393,7 +433,7 @@ const MarketSim = () => {
 
             <window.UI.BottomControls
                 isGenerating={isGenerating} isOnline={isOnline} isMobile={isMobileRef.current}
-                handleGenerateAsset={() => { if (!isGenerating) window.generator.generateAssetForTab(activeTab, getContext()); }}
+                handleGenerateAsset={handleGenerateClick}
                 autopilot={autopilot} setAutopilot={setAutopilot}
                 sliderPercentage={((zoom - 80) / (500 - 80)) * 100}
                 zoom={zoom} setZoom={(val) => { isUserInteractingRef.current = true; zoomTargetRef.current = val; setZoom(val); }}

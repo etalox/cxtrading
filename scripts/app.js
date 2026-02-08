@@ -95,6 +95,16 @@ const MarketSim = () => {
         } catch (e) { return false; }
     };
 
+    const activeTabRef = useRef(0);
+    useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+    const getContext = useCallback(() => ({
+        marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
+        addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
+        setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating, canvasRef, resultLabelsRef,
+        zoomCurrentRef, zoomTargetRef, isIntroActive
+    }), [activeTab, autopilot, balance, assetsInfo, isIntroActive]);
+
     useEffect(() => {
         const hasSession = loadFromSession();
         if (!hasSession) {
@@ -109,11 +119,11 @@ const MarketSim = () => {
             }, 400);
         } else {
             setIsInitialLoading(false);
-            // Safety check: if restored state is not initialized, start generation
+            // Safety check: if restored state is not initialized for ANY tab, trigger search
             const ctx = getContext();
             [0, 1, 2].forEach(idx => {
                 const state = marketStatesRef.current[idx];
-                if (!state || !state.initialized) {
+                if (!state || !state.initialized || (idx === 0 && assetsInfo[0].name === "INIT 01")) {
                     setIsGenerating(true);
                     window.generator.generateAssetForTab(idx, ctx);
                 }
@@ -135,7 +145,6 @@ const MarketSim = () => {
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         const cleanupInteractions = window.Interface.setupZoomAndTouch(containerRef.current, {
-            isUserInteracting: isUserInteractingRef.current,
             zoomTarget: zoomTargetRef,
             pinchStart: pinchStartRef,
             lastTouchTarget: lastTouchTargetRef,
@@ -149,7 +158,7 @@ const MarketSim = () => {
 
         const cleanupDrag = window.Interface.setupHorizontalDrag(containerRef.current, canvasRef.current, {
             marketStatesRef,
-            activeTab,
+            activeTab: activeTabRef,
             zoomCurrentRef,
             isUserInteracting: isUserInteractingRef
         });
@@ -244,30 +253,6 @@ const MarketSim = () => {
             touched.clear();
         }
     };
-
-    const getContext = () => ({
-        marketStatesRef, tickHistoriesRef, kinematicsRef, activeTab, aiBrain, setAiConfidence,
-        addNotification, autopilot, activeTradesRef, lastSignalRef, executeTrade, assetsInfo,
-        setAssetsInfo, assetHistoryRef, setCurrentDuration, setCurrentPriceUI, setIsGenerating, canvasRef, resultLabelsRef,
-        zoomCurrentRef, zoomTargetRef, isIntroActive
-    });
-
-    useEffect(() => {
-        const hasSession = loadFromSession();
-        if (!hasSession) {
-            setIsIntroActive(true);
-            setTimeout(() => {
-                setIsIntroActive(false);
-                setIsInitialLoading(false);
-                if (assetsInfo[0].name === "INIT 01") {
-                    setIsGenerating(true);
-                    [0, 50, 100].forEach((delay, idx) => setTimeout(() => window.generator.generateAssetForTab(idx, getContext()), delay));
-                }
-            }, 400);
-        } else {
-            setIsInitialLoading(false);
-        }
-    }, []);
 
     const handleTabChange = (index) => {
         setActiveTab(index);

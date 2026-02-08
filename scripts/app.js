@@ -394,10 +394,9 @@ const MarketSim = () => {
             {isInitialLoading && <window.UI.LoadingSplash />}
 
             <div className="absolute top-0 left-0 w-full h-full z-10" ref={containerRef}>
-                {isChartReady ? (
-                    <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center opacity-20">
+                <canvas ref={canvasRef} className={`w-full h-full cursor-crosshair transition-opacity duration-500 ${isChartReady ? 'opacity-100' : 'opacity-0'}`} />
+                {!isChartReady && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
                         <div className="text-xl font-light tracking-[0.2em] uppercase">MERCADO NO INICIALIZADO</div>
                     </div>
                 )}

@@ -285,17 +285,24 @@ const MarketSim = () => {
             if (deltaTime >= window.CONFIG.LOGIC_RATE_MS) {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
-                
-                // [LÓGICA DE AUTO-SCROLL UNIFICADA Y SUAVE]
-                // Se activa si NO hay interacción y estamos visualmente cerca del final (-8 velas de tolerancia)
+
                 if (safeTicks > 1 && !isUserInteractingRef.current) {
                     [0, 1, 2].forEach(idx => { 
                         const s = marketStatesRef.current[idx];
-                        if (s.targetScroll >= s.candles.length - 8.0) {
+                        
+                        // 1. Aumentamos tolerancia a 12 velas para que sea fácil "engancharse"
+                        const isNearEnd = s.targetScroll >= s.candles.length - 12.0;
+                        
+                        if (isNearEnd) {
+                            // Actualizamos el objetivo al final real
                             s.targetScroll = s.candles.length; 
-                            // [IMPORTANTE] Eliminada la línea: s.scrollOffset = s.candles.length;
-                            // Esto permite que el gráfico se deslice suavemente hacia la nueva vela
-                            // en lugar de saltar instantáneamente.
+                            
+                            // 2. [TRUCO] Si el offset visual se está quedando muy atrás (> 5 velas),
+                            // le damos un pequeño empujón suave para que no pierda el ritmo,
+                            // pero SIN igualarlo a targetScroll (que causaría el salto).
+                            if (s.candles.length - s.scrollOffset > 5.0) {
+                                s.scrollOffset += 0.1; // Pequeña ayuda extra a la interpolación
+                            }
                         }
                     });
                 }

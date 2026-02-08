@@ -121,9 +121,9 @@ window.generator = {
                 low: Math.min(...state.visualTicks, lastCandleClose),
                 color: close >= lastCandleClose ? '#10b981' : '#f43f5e'
             };
-            const isAtEnd = state.targetScroll >= state.candles.length - 1.1;
+
+            // [CORRECCIÓN] Eliminada lógica de auto-scroll aquí. Solo añadimos la vela.
             state.candles.push(newCandle);
-            if (isAtEnd) state.targetScroll = state.candles.length;
             state.visualTicks = [];
 
             if (state.candles.length > window.CONFIG.MAX_CANDLES) {
@@ -196,15 +196,14 @@ window.generator = {
                 initialized: false
             };
 
-            const randomWarmupMinutes = Math.floor(Math.random() * 30) + 15;
+            // [MODIFICADO] 30 a 60 minutos de historia
+            const randomWarmupMinutes = Math.floor(Math.random() * 30) + 30;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
-            // Staggered reveal: Chart at 200ms, End loading at 400ms
             const elapsed = performance.now() - startTime;
             const dataWait = Math.max(0, 200 - elapsed);
             const animWait = Math.max(0, 400 - elapsed);
 
-            // Step 1: Atomic Data Swap (Reveal Chart)
             setTimeout(() => {
                 ctx.tickHistoriesRef.current[tabIndex] = [];
                 ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
@@ -222,24 +221,18 @@ window.generator = {
                 }
             }, dataWait);
 
-            // Step 2: End Search Animation
             setTimeout(() => {
                 ctx.setIsGenerating(false);
             }, animWait);
         }, 30);
     },
 
-        rebuildCandles: (tabIndex, ctx) => {
+    rebuildCandles: (tabIndex, ctx) => {
         const state = ctx.marketStatesRef.current[tabIndex];
-        
-        // 1. Guardar la posición relativa actual antes de destruir las velas
         const oldLength = state.candles.length || 1;
-        // Qué tan lejos del final estábamos (en velas)
         const distFromEnd = oldLength - state.targetScroll;
-        // O si prefieres mantener el centro exacto:
-        // const scrollRatio = state.targetScroll / oldLength; 
-
         const allTicks = state.allTicks;
+        
         state.candles = [];
         state.visualTicks = [];
         let tempTicks = [];
@@ -262,35 +255,16 @@ window.generator = {
         }
         state.visualTicks = tempTicks;
         
-        // 2. Restaurar la posición traduciendo la distancia
-        // La nueva distancia debe ser proporcional al cambio de densidad
-        // Si antes cada vela era 4 ticks y ahora es 8, hay la mitad de velas, 
-        // así que la "distancia en velas" debe ser la mitad.
-        
-        // Factor de conversión: (VelasViejas / VelasNuevas) no es exacto porque cambia ticksPerCandle.
-        // Mejor: Calcular la nueva posición restando la distancia ajustada desde el nuevo final.
-        
-        // Dado que targetScroll suele ser "índice de vela", si estábamos 10 velas atrás,
-        // y ahora las velas son el doble de "gordas", deberíamos estar 5 velas atrás.
-        // Pero como no sabemos el ratio exacto viejo/nuevo aquí fácil:
-        
-        // TRUCO SIMPLE: Mantenernos "pegados" al final si estábamos cerca, 
-        // o mantener la proporción si estábamos lejos.
-        
+        // Lógica de restauración de posición (ya corregida previamente)
+        const newLength = state.candles.length;
         if (distFromEnd < 2) {
-             // Si estaba al final, mantener al final
-             state.targetScroll = state.candles.length;
-             state.scrollOffset = state.candles.length;
+            state.targetScroll = newLength;
+            state.scrollOffset = newLength;
         } else {
-             // Recalcular basado en proporción de ticks
-             // (distFromEnd * oldTicksPerCandle) / newTicksPerCandle ? 
-             // Como no tenemos oldTicksPerCandle fácil, usamos regla de tres de lengths:
-             const newLength = state.candles.length;
-             const ratio = newLength / oldLength;
-             const newDist = distFromEnd * ratio;
-             
-             state.targetScroll = newLength - newDist;
-             state.scrollOffset = newLength - newDist;
+            const ratio = newLength / oldLength;
+            const newDist = distFromEnd * ratio;
+            state.targetScroll = newLength - newDist;
+            state.scrollOffset = newLength - newDist;
         }
     }
 };

@@ -286,14 +286,16 @@ const MarketSim = () => {
                 const safeTicks = Math.min(Math.floor(deltaTime / window.CONFIG.LOGIC_RATE_MS), 20);
                 for (let i = 0; i < safeTicks; i++) runMarketLogic(safeTicks > 1);
                 
-                // [LÓGICA DE AUTO-SCROLL MEJORADA]
-                // Solo activamos el seguimiento si NO hay interacción Y estamos visualmente cerca del final.
+                // [LÓGICA DE AUTO-SCROLL UNIFICADA Y SUAVE]
+                // Se activa si NO hay interacción y estamos visualmente cerca del final (-8 velas de tolerancia)
                 if (safeTicks > 1 && !isUserInteractingRef.current) {
                     [0, 1, 2].forEach(idx => { 
                         const s = marketStatesRef.current[idx];
-                        if (s.targetScroll >= s.candles.length - 8) {
+                        if (s.targetScroll >= s.candles.length - 8.0) {
                             s.targetScroll = s.candles.length; 
-                            s.scrollOffset = s.candles.length; 
+                            // [IMPORTANTE] Eliminada la línea: s.scrollOffset = s.candles.length;
+                            // Esto permite que el gráfico se deslice suavemente hacia la nueva vela
+                            // en lugar de saltar instantáneamente.
                         }
                     });
                 }

@@ -17,7 +17,7 @@ window.CONFIG = {
     ANCHOR_DEFAULT: 0.75,
 
     // Chart Layout - Mobile
-    Y_RANGE_PADDING_MOBILE: 0.5,
+    Y_RANGE_PADDING_MOBILE: 0.50,
     ANCHOR_DEFAULT_MOBILE: 0.6,
 
     // Zoom Controls

@@ -23,29 +23,81 @@ window.Interface = {
         }
     },
 
-    setupZoomAndTouch: (container, refs) => {
+     setupZoomAndTouch: (container, refs) => {
         if (!container) return;
+
+        let zoomTimeout;
 
         const onWheel = (e) => {
             if (window.Interface.isInteractive(e.target)) return;
             e.preventDefault();
+            
+            // Indicar que el usuario está interactuando
             refs.isUserInteracting.current = true;
-            const factor = e.deltaY > 0 ? 1.06 : 0.94;
-            const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
-            refs.zoomTarget.current = newTarget;
-            refs.setZoom(newTarget);
+            clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => {
+                // Opcional: refs.isUserInteracting.current = false;
+            }, 150);
 
-            // Enforce boundary after zoom
-            const state = refs.marketStatesRef.current[refs.activeTab];
-            const dpr = window.devicePixelRatio || 1;
+            // DETECTAR SI ES ZOOM O SCROLL
+            // CtrlKey suele ser true en pinch-to-zoom de trackpads
+            const isZoom = e.ctrlKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) * 2; 
+            
+            // Sin embargo, para trackpads precisos, queremos permitir paneo horizontal
+            // Si el deltaX es significativo, es paneo horizontal.
+            const isHorizontalScroll = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+
+            if (e.ctrlKey) {
+                // --- MODO ZOOM (Pellizco) ---
+                // CORREGIDO: Invertido para que "abrir dedos" (deltaY < 0 usualmente) haga Zoom IN (aumentar target)
+                // Antes: e.deltaY > 0 ? 0.96 : 1.04;
+                // Ahora: e.deltaY > 0 ? 0.96 : 1.04; <-- Espera, revisemos la lógica estándar:
+                // Pinch Out (Abrir) -> deltaY es negativo en muchos navegadores -> Queremos Zoom IN (Factor > 1)
+                // Pinch In (Cerrar) -> deltaY es positivo -> Queremos Zoom OUT (Factor < 1)
+                
+                const factor = e.deltaY > 0 ? 1.04 : 0.96; 
+                // Si sientes que sigue al revés, usa: e.deltaY > 0 ? 1.04 : 0.96;
+                
+                const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
+                refs.zoomTarget.current = newTarget;
+                refs.setZoom(newTarget);
+            }  else if (isHorizontalScroll) {
+                // --- MODO SCROLL HORIZONTAL (Trackpad) ---
+                const state = refs.marketStatesRef.current[refs.activeTab.current];
+                const width = container.clientWidth;
+                // Sensibilidad del scroll: ajustar divisor (ej. 2 o 1)
+                const scrollSpeed = 2; 
+                
+                const candleWidth = (width / refs.zoomTarget.current) * (state.ticksPerCandle / 4);
+                const candleDelta = (e.deltaX * scrollSpeed) / candleWidth;
+                
+                // Mover scroll (invertido: arrastrar izquierda = ver futuro, derecha = ver pasado)
+                // Ojo: en trackpad, deslizar dedos a la izquierda (deltaX > 0) suele significar "mover contenido a la izquierda" (ver derecha)
+                state.targetScroll += candleDelta; 
+            } else {
+                 // --- MODO ZOOM NORMAL (Rueda Mouse) ---
+                 const factor = e.deltaY > 0 ? 0.94 : 1.06;
+                 const newTarget = Math.max(80, Math.min(500, refs.zoomTarget.current * factor));
+                 refs.zoomTarget.current = newTarget;
+                 refs.setZoom(newTarget);
+            }
+
+            // --- LÍMITES COMUNES (Aplicar siempre) ---
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
             const width = container.clientWidth;
-            const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+            const candleWidth = (width / refs.zoomTarget.current) * (state.ticksPerCandle / 4);
+            
             const isSmall = width < 768;
             const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
             const anchorX = width * anchorDefault;
             const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
             const minScroll = (anchorX + shift) / candleWidth;
-            if (state.targetScroll < minScroll) state.targetScroll = minScroll;
+
+            if (state.targetScroll < minScroll) {
+                state.targetScroll = minScroll;
+            } else if (state.targetScroll > state.candles.length) {
+                state.targetScroll = state.candles.length;
+            }
         };
 
         let touchActive = false;
@@ -69,21 +121,23 @@ window.Interface = {
                 const ratio = refs.pinchStart.current / dist;
                 refs.pinchStart.current = dist;
                 refs.isUserInteracting.current = true;
+                
                 const newTarget = Math.max(80, Math.min(500, Math.round(refs.zoomTarget.current * ratio)));
                 refs.zoomTarget.current = newTarget;
                 refs.setZoom(newTarget);
 
-                // Enforce boundary after zoom
-                const state = refs.marketStatesRef.current[refs.activeTab];
-                const dpr = window.devicePixelRatio || 1;
+                const state = refs.marketStatesRef.current[refs.activeTab.current];
                 const width = container.clientWidth;
                 const candleWidth = (width / newTarget) * (state.ticksPerCandle / 4);
+                
                 const isSmall = width < 768;
                 const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
                 const anchorX = width * anchorDefault;
                 const shift = ((state.ticksPerCandle - 1) / 2) * (candleWidth / state.ticksPerCandle);
                 const minScroll = (anchorX + shift) / candleWidth;
+                
                 if (state.targetScroll < minScroll) state.targetScroll = minScroll;
+                // Nota: En pinch zoom móvil generalmente dejamos que el usuario se mueva libremente hasta que suelte
             }
         };
 
@@ -119,7 +173,7 @@ window.Interface = {
             if (window.Interface.isInteractive(target)) return;
             isDragging = true;
             startX = clientX;
-            const state = refs.marketStatesRef.current[refs.activeTab];
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
             startTargetScroll = state.targetScroll;
             refs.isUserInteracting.current = true;
         };
@@ -127,20 +181,15 @@ window.Interface = {
         const handleMove = (clientX) => {
             if (!isDragging) return;
             const deltaX = clientX - startX;
-            const state = refs.marketStatesRef.current[refs.activeTab];
+            const state = refs.marketStatesRef.current[refs.activeTab.current];
 
-            // Calculate candle width (consistent with draw.js)
             const dpr = window.devicePixelRatio || 1;
             const width = canvas.width / dpr;
             const candleWidth = (width / refs.zoomCurrentRef.current) * (state.ticksPerCandle / 4);
 
-            // Convert pixel delta to candle index delta
             const candleDelta = deltaX / candleWidth;
-
-            // Update targetScroll (dragging left moves chart right, so index decreases)
             const newTarget = startTargetScroll - candleDelta;
 
-            // Limit scroll: Left extreme (constrained) to Right extreme (candles.length)
             const isSmall = width < 768;
             const anchorDefault = isSmall ? window.CONFIG.ANCHOR_DEFAULT_MOBILE : window.CONFIG.ANCHOR_DEFAULT;
             const anchorX = width * anchorDefault;
@@ -149,12 +198,8 @@ window.Interface = {
 
             state.targetScroll = Math.max(minScroll, Math.min(state.candles.length, newTarget));
 
-            // If the user drags away from the end, we consider them interacting
             if (state.targetScroll < state.candles.length - 0.1) {
                 refs.isUserInteracting.current = true;
-            } else {
-                // If they drag back to the very end, we can resume auto-scroll later
-                // refs.isUserInteracting.current = false; // Optional: snap back to auto-follow
             }
         };
 
@@ -172,7 +217,6 @@ window.Interface = {
         const onTouchMove = (e) => {
             if (e.touches.length === 1 && isDragging) {
                 handleMove(e.touches[0].clientX);
-                // Prevent browser back/forward gestures while dragging the chart
                 if (Math.abs(e.touches[0].clientX - startX) > 5) e.preventDefault();
             }
         };

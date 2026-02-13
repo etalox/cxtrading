@@ -121,9 +121,9 @@ window.generator = {
                 low: Math.min(...state.visualTicks, lastCandleClose),
                 color: close >= lastCandleClose ? '#10b981' : '#f43f5e'
             };
-            const isAtEnd = state.targetScroll >= state.candles.length - 1.1;
+
+            // [CORRECCIÓN] Eliminada lógica de auto-scroll aquí. Solo añadimos la vela.
             state.candles.push(newCandle);
-            if (isAtEnd) state.targetScroll = state.candles.length;
             state.visualTicks = [];
 
             if (state.candles.length > window.CONFIG.MAX_CANDLES) {
@@ -196,15 +196,14 @@ window.generator = {
                 initialized: false
             };
 
-            const randomWarmupMinutes = Math.floor(Math.random() * 6) + 10;
+            // [MODIFICADO] 30 a 60 minutos de historia
+            const randomWarmupMinutes = Math.floor(Math.random() * 30) + 30;
             window.generator.warmUpMarket(newState, ctx, randomWarmupMinutes);
 
-            // Staggered reveal: Chart at 200ms, End loading at 400ms
             const elapsed = performance.now() - startTime;
             const dataWait = Math.max(0, 200 - elapsed);
             const animWait = Math.max(0, 400 - elapsed);
 
-            // Step 1: Atomic Data Swap (Reveal Chart)
             setTimeout(() => {
                 ctx.tickHistoriesRef.current[tabIndex] = [];
                 ctx.kinematicsRef.current[tabIndex] = { lastEma: null, lastVelocity: 0, alpha: 0.15, delta: 0.0001 };
@@ -222,7 +221,6 @@ window.generator = {
                 }
             }, dataWait);
 
-            // Step 2: End Search Animation
             setTimeout(() => {
                 ctx.setIsGenerating(false);
             }, animWait);
@@ -231,7 +229,10 @@ window.generator = {
 
     rebuildCandles: (tabIndex, ctx) => {
         const state = ctx.marketStatesRef.current[tabIndex];
+        const oldLength = state.candles.length || 1;
+        const distFromEnd = oldLength - state.targetScroll;
         const allTicks = state.allTicks;
+        
         state.candles = [];
         state.visualTicks = [];
         let tempTicks = [];
@@ -253,7 +254,17 @@ window.generator = {
             }
         }
         state.visualTicks = tempTicks;
-        state.targetScroll = state.candles.length;
-        state.scrollOffset = state.candles.length;
+        
+        // Lógica de restauración de posición (ya corregida previamente)
+        const newLength = state.candles.length;
+        if (distFromEnd < 2) {
+            state.targetScroll = newLength;
+            state.scrollOffset = newLength;
+        } else {
+            const ratio = newLength / oldLength;
+            const newDist = distFromEnd * ratio;
+            state.targetScroll = newLength - newDist;
+            state.scrollOffset = newLength - newDist;
+        }
     }
 };
